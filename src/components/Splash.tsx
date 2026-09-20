@@ -32,27 +32,35 @@ export function Splash({ onReady, run }: { onReady: () => void; run?: () => Prom
       setMessage(steps[i]!);
     }, 320);
 
-    const run = async () => {
+    const boot = async () => {
       try {
         if (typeof navigator !== "undefined" && navigator.onLine === false) {
-          throw new Error("offline");
+          throw new Error("You appear to be offline. Check your connection and try again.");
         }
-        await new Promise((r) => window.setTimeout(r, 1600));
+        if (run) await run();
+        else await new Promise((r) => window.setTimeout(r, 1200));
         if (cancelled) return;
         setProgress(100);
         setPhase("done");
         window.setTimeout(() => !cancelled && onReady(), 350);
-      } catch {
-        if (!cancelled) setPhase("error");
+      } catch (e) {
+        if (cancelled) return;
+        setErrorText(
+          e instanceof Error && e.message
+            ? e.message
+            : "We couldn't reach the farm. Check your internet connection and try again.",
+        );
+        setPhase("error");
       }
     };
-    void run();
+    void boot();
 
     return () => {
       cancelled = true;
       window.clearInterval(tick);
     };
-  }, [attempt, onReady]);
+  }, [attempt, onReady, run]);
+
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background px-6 text-center">
