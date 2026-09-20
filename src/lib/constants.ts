@@ -6,3 +6,9 @@ export const ADMIN_TELEGRAM_ID = 5419054691;
 export const PUBLIC_APP_URL = "https://sweet-hello-blender.lovable.app";
 export const BANNER_URL = `${PUBLIC_APP_URL}/__l5e/assets-v1/d44082d7-4273-4267-9eaf-2f5a868540e4/fox-banner.png`;
 
+
+/** Partner sites shown in the Ads tab (rewarded visits). */
+export const PARTNER_SITES: { title: string; url: string }[] = [
+  { title: "Fox Farm community channel", url: COMMUNITY_URL },
+  { title: "Fox Farm payout proofs", url: PAYMENT_URL },
+];
