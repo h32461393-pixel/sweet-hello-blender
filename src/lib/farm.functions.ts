@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { MINI_APP_URL, COMMUNITY_URL, PAYMENT_URL, ADMIN_TELEGRAM_ID } from "./constants";
+import { MINI_APP_URL, COMMUNITY_URL, PAYMENT_URL, ADMIN_TELEGRAM_ID, BANNER_URL } from "./constants";
 
 type Ctx = Awaited<ReturnType<typeof loadCtx>>;
 
@@ -109,10 +109,9 @@ export const syncUser = createServerFn({ method: "POST" })
       }
     }
 
-    const banner = new URL("/og-banner.png", process.env["PUBLIC_APP_URL"] ?? "https://sweet-hello-blender.lovable.app").toString();
     await sendPhoto(
       ctx.tg.id,
-      banner,
+      BANNER_URL,
       `🦊 <b>Welcome to Fox Farm!</b> 🌾\n\nStart mining FOX tokens every hour, complete tasks, invite friends and withdraw in USDT (BEP-20).\n\n🚜 Tap below to start farming!`,
       [
         [{ text: "🦊 Open Mini App", url: MINI_APP_URL }],

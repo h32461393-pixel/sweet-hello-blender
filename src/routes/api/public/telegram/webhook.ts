@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { MINI_APP_URL, COMMUNITY_URL, PAYMENT_URL } from "@/lib/constants";
+import { MINI_APP_URL, COMMUNITY_URL, PAYMENT_URL, BANNER_URL } from "@/lib/constants";
 
 type Update = {
   message?: {
@@ -28,10 +28,9 @@ export const Route = createFileRoute("/api/public/telegram/webhook")({
 
         const msg = update.message;
         if (msg?.text?.startsWith("/start")) {
-          const origin = new URL(request.url).origin;
           await sendPhoto(
             msg.chat.id,
-            `${origin}/og-banner.png`,
+            BANNER_URL,
             `🦊 <b>Fox Farm</b> 🌾\n\nWelcome${msg.from?.first_name ? ", " + msg.from.first_name : ""}!\n\n⛏️ Mine FOX tokens every hour\n✅ Complete daily and partner tasks\n👥 Invite friends and earn up to 1,200 FOX each\n🎁 Daily streak rewards up to 150 FOX\n💸 Withdraw in USDT (BEP-20)\n\nTap below to start farming!`,
             [
               [{ text: "🦊 Open Mini App", url: MINI_APP_URL }],
