@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { Toaster } from "@/components/ui/sonner";
 import { Splash } from "@/components/Splash";
 import { AppShell, type TabKey } from "@/components/AppShell";
 import { HomeTab } from "@/components/tabs/HomeTab";
@@ -7,6 +9,9 @@ import { TasksTab } from "@/components/tabs/TasksTab";
 import { AdsTab } from "@/components/tabs/AdsTab";
 import { ReferTab } from "@/components/tabs/ReferTab";
 import { ProfileTab } from "@/components/tabs/ProfileTab";
+import { syncUser } from "@/lib/farm.functions";
+import { getInitData, getWebApp } from "@/lib/telegram-client";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
