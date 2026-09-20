@@ -12,4 +12,6 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  // Keep the generated server bundle compatible with Vercel's free hosting runtime.
+  nitro: { preset: "vercel" },
 });

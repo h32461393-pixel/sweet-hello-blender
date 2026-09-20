@@ -14,7 +14,11 @@ export const Route = createFileRoute("/api/public/telegram/webhook")({
     handlers: {
       POST: async ({ request }) => {
         const secret = process.env["TELEGRAM_WEBHOOK_SECRET"];
-        if (secret && request.headers.get("x-telegram-bot-api-secret-token") !== secret) {
+        if (!secret) {
+          console.error("TELEGRAM_WEBHOOK_SECRET is not configured");
+          return new Response("Webhook is not configured", { status: 503 });
+        }
+        if (request.headers.get("x-telegram-bot-api-secret-token") !== secret) {
           return new Response("Unauthorized", { status: 401 });
         }
 
