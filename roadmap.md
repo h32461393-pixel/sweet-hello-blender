@@ -16,5 +16,5 @@
 - Admin gate: owner Telegram id + ADMIN_PANEL_USER / ADMIN_PANEL_PASSWORD secrets (never in code)
 
 ## Open
-- Set ADMIN_PANEL_USER / ADMIN_PANEL_PASSWORD secrets before building the admin panel
+- [x] Store ADMIN_PANEL_USER / ADMIN_PANEL_PASSWORD as encrypted server secrets
 - Rotate the bot token and keys that were pasted in chat
