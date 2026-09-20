@@ -44,6 +44,15 @@ Vercel deploy එක අවසන් වූ පසු ඔබට `https://YOUR-AP
 
 ## 4. Telegram Mini App URL එක
 
+Admin panel එක භාවිතා කිරීමට Vercel Environment Variables තුළ පහත server-only values දෙකත් එකතු කරන්න:
+
+```text
+ADMIN_PANEL_USER=ඔබගේ admin username එක
+ADMIN_PANEL_PASSWORD=ශක්තිමත්, වෙනත් තැනක භාවිතා නොකළ password එකක්
+```
+
+මේ දෙකට `VITE_` prefix එක යොදන්න එපා. සැබෑ values GitHub හෝ `.env.example` තුළ save නොකරන්න.
+
 BotFather තුළ Mini App/Web App URL එක මෙලෙස සකසන්න:
 
 ```text
