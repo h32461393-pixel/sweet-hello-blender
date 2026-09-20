@@ -8,6 +8,8 @@ import {
   claimDaily,
   claimRewardCode,
   claimChannelTask,
+  getAdsState,
+  claimAdView,
 } from "@/lib/farm.functions";
 import { getInitData } from "@/lib/telegram-client";
 
@@ -54,6 +56,30 @@ export function useClaimRewardCode() {
 }
 export function useClaimChannelTask() {
   return useFarmAction(useServerFn(claimChannelTask));
+}
+
+export function useAdsState(enabled = true) {
+  const fn = useServerFn(getAdsState);
+  return useQuery({
+    queryKey: ["ads-state"],
+    queryFn: () => fn({ data: { initData: getInitData() } }),
+    enabled,
+    refetchOnWindowFocus: true,
+    retry: 1,
+  });
+}
+
+export function useClaimAdView() {
+  const qc = useQueryClient();
+  const fn = useServerFn(claimAdView);
+  return useMutation({
+    mutationFn: (args: { source: "adsgram" | "site" }) =>
+      fn({ data: { ...args, initData: getInitData() } }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: HOME_KEY });
+      qc.invalidateQueries({ queryKey: ["ads-state"] });
+    },
+  });
 }
 
 export function friendlyError(e: unknown): string {
