@@ -73,10 +73,9 @@ export function Splash({ onReady, run }: { onReady: () => void; run?: () => Prom
       {phase === "error" ? (
         <div className="mt-8 w-full max-w-xs rounded-2xl border border-destructive/30 bg-card p-5 shadow-sm">
           <p className="text-2xl">📡</p>
-          <h2 className="mt-2 font-bold text-destructive">Network error</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            We couldn't reach the farm. Check your internet connection and try again.
-          </p>
+          <h2 className="mt-2 font-bold text-destructive">Something went wrong</h2>
+          <p className="mt-1 text-sm text-muted-foreground">{errorText}</p>
+
           <button
             onClick={() => setAttempt((a) => a + 1)}
             className="mt-4 w-full rounded-xl bg-primary px-4 py-2.5 font-semibold text-primary-foreground transition hover:brightness-105 active:scale-[0.98]"
