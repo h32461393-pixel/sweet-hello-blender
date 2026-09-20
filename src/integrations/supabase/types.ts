@@ -14,6 +14,41 @@ export type Database = {
   }
   public: {
     Tables: {
+      ad_views: {
+        Row: {
+          created_at: string
+          day: string
+          id: string
+          reward: number
+          source: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          day?: string
+          id?: string
+          reward: number
+          source: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          day?: string
+          id?: string
+          reward?: number
+          source?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ad_views_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "app_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       admin_audit: {
         Row: {
           action: string
@@ -444,6 +479,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_ad_view_v1: {
+        Args: {
+          _cooldown_seconds: number
+          _daily_cap: number
+          _reward: number
+          _source: string
+          _user_id: string
+        }
+        Returns: Json
+      }
       claim_daily_v1: {
         Args: { _rewards: number[]; _user_id: string }
         Returns: Json

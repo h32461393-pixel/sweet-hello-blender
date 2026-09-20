@@ -15,6 +15,13 @@
       "when": 1789894157541,
       "tag": "0001_security_hardening",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789894866015,
+      "tag": "0002_ads_and_payout_proof",
+      "breakpoints": true
     }
   ]
 }
