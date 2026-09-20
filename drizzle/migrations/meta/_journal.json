@@ -8,6 +8,13 @@
       "when": 1789892819315,
       "tag": "0000_fox_farm_core",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789894157541,
+      "tag": "0001_security_hardening",
+      "breakpoints": true
     }
   ]
 }
