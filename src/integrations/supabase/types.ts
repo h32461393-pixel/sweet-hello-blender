@@ -444,6 +444,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_daily_v1: {
+        Args: { _rewards: number[]; _user_id: string }
+        Returns: Json
+      }
+      claim_mining_v1: {
+        Args: { _duration_minutes: number; _reward: number; _user_id: string }
+        Returns: Json
+      }
+      claim_reward_code_v1: {
+        Args: { _code: string; _user_id: string }
+        Returns: Json
+      }
       credit_user: {
         Args: {
           _amount: number
@@ -454,6 +466,26 @@ export type Database = {
         }
         Returns: number
       }
+      debit_user: {
+        Args: {
+          _amount: number
+          _key: string
+          _kind: string
+          _note: string
+          _user_id: string
+        }
+        Returns: number
+      }
+      rl_hit: {
+        Args: {
+          _bucket: string
+          _limit: number
+          _subject: string
+          _window_seconds: number
+        }
+        Returns: boolean
+      }
+      start_mining_v1: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never
