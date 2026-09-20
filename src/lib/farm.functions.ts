@@ -21,6 +21,8 @@ function rpcMessage(error: unknown, fallback: string): string {
     "This code is fully used",
     "You already used this code",
     "insufficient balance",
+    "Daily limit reached",
+    "Please wait a moment",
   ];
   return known.find((k) => msg.includes(k)) ?? fallback;
 }
