@@ -142,3 +142,62 @@
     color: var(--color-foreground);
   }
 }
+
+/* ---- Fox Farm theme ---- */
+:root {
+  --background: oklch(0.97 0.03 110);
+  --foreground: oklch(0.26 0.05 60);
+  --card: oklch(0.99 0.015 95);
+  --card-foreground: oklch(0.26 0.05 60);
+  --popover: oklch(0.99 0.015 95);
+  --popover-foreground: oklch(0.26 0.05 60);
+  --primary: oklch(0.7 0.19 45);
+  --primary-foreground: oklch(0.99 0.01 90);
+  --secondary: oklch(0.92 0.06 120);
+  --secondary-foreground: oklch(0.3 0.06 130);
+  --muted: oklch(0.94 0.03 110);
+  --muted-foreground: oklch(0.5 0.04 90);
+  --accent: oklch(0.83 0.16 90);
+  --accent-foreground: oklch(0.28 0.06 60);
+  --destructive: oklch(0.58 0.23 27);
+  --destructive-foreground: oklch(0.98 0.01 90);
+  --border: oklch(0.88 0.04 100);
+  --input: oklch(0.88 0.04 100);
+  --ring: oklch(0.7 0.19 45);
+  --usdt: oklch(0.6 0.13 165);
+  --usdt-foreground: oklch(0.98 0.01 165);
+  --barn: oklch(0.45 0.16 30);
+  --wood: oklch(0.42 0.07 60);
+}
+.dark {
+  --background: oklch(0.2 0.03 120);
+  --foreground: oklch(0.96 0.02 100);
+  --card: oklch(0.26 0.035 120);
+  --card-foreground: oklch(0.96 0.02 100);
+  --popover: oklch(0.26 0.035 120);
+  --popover-foreground: oklch(0.96 0.02 100);
+  --primary: oklch(0.73 0.19 45);
+  --primary-foreground: oklch(0.18 0.03 60);
+  --secondary: oklch(0.32 0.05 130);
+  --secondary-foreground: oklch(0.95 0.02 110);
+  --muted: oklch(0.3 0.03 120);
+  --muted-foreground: oklch(0.72 0.03 100);
+  --accent: oklch(0.8 0.16 90);
+  --accent-foreground: oklch(0.2 0.04 60);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.73 0.19 45);
+  --usdt: oklch(0.68 0.13 165);
+  --usdt-foreground: oklch(0.15 0.02 165);
+  --barn: oklch(0.5 0.16 30);
+  --wood: oklch(0.38 0.07 60);
+}
+@theme inline {
+  --color-usdt: var(--usdt);
+  --color-usdt-foreground: var(--usdt-foreground);
+  --color-barn: var(--barn);
+  --color-wood: var(--wood);
+}
+@keyframes fox-bob { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-10px) } }
+@keyframes fox-shine { 0% { background-position: -200% 0 } 100% { background-position: 200% 0 } }
+@utility animate-fox-bob { animation: fox-bob 2s ease-in-out infinite; }
