@@ -300,3 +300,136 @@ export const claimChannelTask = createServerFn({ method: "POST" })
   });
 
 export const CHANNEL_LINKS = { community: COMMUNITY_URL, payment: PAYMENT_URL };
+
+/* ---------------------------------------------------------------------------
+ * Rewarded ads (Adsgram) and partner site visits.
+ * Ads are always optional: no app feature is locked behind watching an ad,
+ * and a reward is only paid after the ad provider reports a completed view.
+ * ------------------------------------------------------------------------- */
+
+type AdsConfig = {
+  adReward: number;
+  adDailyCap: number;
+  adCooldownSeconds: number;
+  siteReward: number;
+  siteDailyCap: number;
+  siteCooldownSeconds: number;
+};
+
+async function adsConfig(db: Ctx["db"]): Promise<AdsConfig> {
+  const c = await getConfig(db, "ads");
+  return {
+    adReward: Number(c["ad_reward"] ?? 5),
+    adDailyCap: Number(c["ad_daily_cap"] ?? 25),
+    adCooldownSeconds: Number(c["ad_cooldown_seconds"] ?? 30),
+    siteReward: Number(c["site_reward"] ?? 10),
+    siteDailyCap: Number(c["site_daily_cap"] ?? 4),
+    siteCooldownSeconds: Number(c["site_cooldown_seconds"] ?? 60),
+  };
+}
+
+/** Everything the Ads screen needs: limits, progress and today's earnings. */
+export const getAdsState = createServerFn({ method: "POST" })
+  .inputValidator(vInit)
+  .handler(async ({ data }) => {
+    const ctx = await loadCtx(data.initData);
+    await rateLimit(ctx.db, "ads_state", ctx.tg.id, 60, 60);
+    const u = await getUserRow(ctx);
+    const cfg = await adsConfig(ctx.db);
+
+    const today = todayUTC();
+    const { data: rows } = await ctx.db
+      .from("ad_views")
+      .select("source, reward")
+      .eq("user_id", u.id)
+      .eq("day", today);
+
+    const list = rows ?? [];
+    const count = (s: string) => list.filter((r) => r.source === s).length;
+    const earnedToday = list.reduce((sum, r) => sum + Number(r.reward ?? 0), 0);
+
+    return {
+      balance: Number(u.balance ?? 0),
+      earnedToday,
+      ad: { reward: cfg.adReward, used: count("adsgram"), cap: cfg.adDailyCap },
+      site: { reward: cfg.siteReward, used: count("site"), cap: cfg.siteDailyCap },
+    };
+  });
+
+/** Called only after the provider confirms the view; the server re-checks everything. */
+export const claimAdView = createServerFn({ method: "POST" })
+  .inputValidator((d: { initData: string; source: "adsgram" | "site" }) => {
+    if (typeof d?.initData !== "string" || !d.initData) throw new Error("Invalid session");
+    if (d?.source !== "adsgram" && d?.source !== "site") throw new Error("Invalid request");
+    return { initData: d.initData, source: d.source };
+  })
+  .handler(async ({ data }) => {
+    const ctx = await loadCtx(data.initData);
+    await rateLimit(ctx.db, "ad_claim", ctx.tg.id, 40, 3600);
+    const u = await getUserRow(ctx);
+    const cfg = await adsConfig(ctx.db);
+    const isAd = data.source === "adsgram";
+
+    const res = await ctx.db.rpc("claim_ad_view_v1", {
+      _user_id: u.id,
+      _source: data.source,
+      _reward: isAd ? cfg.adReward : cfg.siteReward,
+      _daily_cap: isAd ? cfg.adDailyCap : cfg.siteDailyCap,
+      _cooldown_seconds: isAd ? cfg.adCooldownSeconds : cfg.siteCooldownSeconds,
+    });
+    if (res.error) throw new Error(rpcMessage(res.error, "Could not verify this view"));
+    const out = res.data as { reward: number; balance: number; used: number; cap: number };
+    return {
+      reward: Number(out.reward),
+      balance: Number(out.balance),
+      used: Number(out.used),
+      cap: Number(out.cap),
+    };
+  });
+
+/** Public proof of payouts: paid withdrawals and a top earners leaderboard. */
+export const getPayoutProof = createServerFn({ method: "GET" }).handler(async () => {
+  const { supabaseAdmin: db } = await import("@/integrations/supabase/client.server");
+
+  const [paid, totals, top] = await Promise.all([
+    db
+      .from("withdrawals")
+      .select("net_usd, amount_tokens, txid, processed_at, app_users(username, first_name)")
+      .eq("status", "paid")
+      .order("processed_at", { ascending: false })
+      .limit(50),
+    db.from("withdrawals").select("net_usd, status"),
+    db
+      .from("app_users")
+      .select("username, first_name, total_earned")
+      .eq("suspended", false)
+      .order("total_earned", { ascending: false })
+      .limit(20),
+  ]);
+
+  const mask = (u: { username?: string | null; first_name?: string | null } | null) => {
+    const name = u?.username ? `@${u.username}` : (u?.first_name ?? "Fox farmer");
+    return name.length > 4 ? `${name.slice(0, 4)}***` : name;
+  };
+
+  const all = totals.data ?? [];
+  const sum = (s: string) =>
+    all.filter((w) => w.status === s).reduce((n, w) => n + Number(w.net_usd ?? 0), 0);
+
+  return {
+    totalPaidUsd: Number(sum("paid").toFixed(4)),
+    pendingUsd: Number(sum("pending").toFixed(4)),
+    payouts: (paid.data ?? []).map((w) => ({
+      user: mask((w as { app_users?: { username?: string | null; first_name?: string | null } }).app_users ?? null),
+      usd: Number(w.net_usd ?? 0),
+      tokens: Number(w.amount_tokens ?? 0),
+      txid: (w.txid as string) ?? null,
+      at: (w.processed_at as string) ?? null,
+    })),
+    leaderboard: (top.data ?? []).map((u, i) => ({
+      rank: i + 1,
+      user: mask(u),
+      earned: Number(u.total_earned ?? 0),
+    })),
+  };
+});
