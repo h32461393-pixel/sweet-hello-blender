@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import logo from "@/assets/fox-logo.png.asset.json";
+import { assetUrl } from "@/lib/constants";
 
 type Phase = "loading" | "error" | "done";
 
@@ -65,7 +66,7 @@ export function Splash({ onReady, run }: { onReady: () => void; run?: () => Prom
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background px-6 text-center">
       <img
-        src={logo.url}
+        src={assetUrl(logo.url)}
         alt="Fox Farm"
         className="animate-fox-bob w-56 max-w-[70vw] drop-shadow-xl"
       />

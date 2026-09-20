@@ -3,6 +3,7 @@ import { Coins, Gift, Pickaxe, Send, Ticket, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { GuideCard, SectionTitle, type TabKey } from "@/components/AppShell";
 import logo from "@/assets/fox-logo.png.asset.json";
+import { assetUrl } from "@/lib/constants";
 import { COMMUNITY_URL, PAYMENT_URL } from "@/lib/constants";
 import { openLink, haptic } from "@/lib/telegram-client";
 import {
