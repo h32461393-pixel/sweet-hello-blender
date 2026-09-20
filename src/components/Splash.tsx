@@ -3,11 +3,15 @@ import logo from "@/assets/fox-logo.png.asset.json";
 
 type Phase = "loading" | "error" | "done";
 
-export function Splash({ onReady }: { onReady: () => void }) {
+export function Splash({ onReady, run }: { onReady: () => void; run?: () => Promise<void> }) {
   const [phase, setPhase] = useState<Phase>("loading");
   const [progress, setProgress] = useState(0);
   const [message, setMessage] = useState("Waking up the farm…");
   const [attempt, setAttempt] = useState(0);
+  const [errorText, setErrorText] = useState(
+    "We couldn't reach the farm. Check your internet connection and try again.",
+  );
+
 
   useEffect(() => {
     let cancelled = false;
