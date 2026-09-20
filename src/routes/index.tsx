@@ -1,24 +1,48 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useCallback, useState } from "react";
+import { Splash } from "@/components/Splash";
+import { AppShell, type TabKey } from "@/components/AppShell";
+import { HomeTab } from "@/components/tabs/HomeTab";
+import { TasksTab } from "@/components/tabs/TasksTab";
+import { AdsTab } from "@/components/tabs/AdsTab";
+import { ReferTab } from "@/components/tabs/ReferTab";
+import { ProfileTab } from "@/components/tabs/ProfileTab";
 
-// No head() here: the home route inherits title/description/og/twitter from
-// __root.tsx, and ships no og:image so serve-time hosting can inject the
-// project's social preview (explicit og:image or latest screenshot).
 export const Route = createFileRoute("/")({
+  head: () => ({
+    meta: [
+      { title: "Fox Farm — Watch Ads, Complete Tasks, Earn USDT" },
+      {
+        name: "description",
+        content:
+          "Fox Farm is a Telegram mini app where you mine FOX tokens, complete tasks, refer friends and withdraw USDT.",
+      },
+      { property: "og:title", content: "Fox Farm — Earn USDT on Telegram" },
+      {
+        property: "og:description",
+        content: "Mine FOX every hour, complete tasks, invite friends and withdraw USDT BEP-20.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
+    ],
+  }),
   component: Index,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
 function Index() {
+  const [ready, setReady] = useState(false);
+  const [tab, setTab] = useState<TabKey>("home");
+  const onReady = useCallback(() => setReady(true), []);
+
+  if (!ready) return <Splash onReady={onReady} />;
+
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
-    </div>
+    <AppShell tab={tab} onTab={setTab}>
+      {tab === "home" && <HomeTab />}
+      {tab === "tasks" && <TasksTab />}
+      {tab === "ads" && <AdsTab />}
+      {tab === "refer" && <ReferTab />}
+      {tab === "profile" && <ProfileTab />}
+    </AppShell>
   );
 }
