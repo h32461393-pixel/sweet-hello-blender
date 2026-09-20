@@ -27,3 +27,7 @@ npm run dev
 - TypeScript
 - React
 - Tailwind CSS
+
+## Free Vercel deployment
+
+සිංහලෙන් සම්පූර්ණ setup guide එක සඳහා [`docs/VERCEL-SI.md`](docs/VERCEL-SI.md) බලන්න. අවශ්‍ය variable names `.env.example` file එකේ ඇත; සැබෑ private values repository එකට commit නොකරන්න.
