@@ -163,127 +163,88 @@ export const getHomeState = createServerFn({ method: "POST" })
   });
 
 export const startMining = createServerFn({ method: "POST" })
-  .inputValidator((d: { initData: string }) => d)
+  .inputValidator(vInit)
   .handler(async ({ data }) => {
     const ctx = await loadCtx(data.initData);
+    await rateLimit(ctx.db, "mine_start", ctx.tg.id, 10, 60);
     const u = await getUserRow(ctx);
-    if (u.mining_started_at && !u.mining_claimed) throw new Error("Mining is already running");
-    await ctx.db
-      .from("app_users")
-      .update({ mining_started_at: new Date().toISOString(), mining_claimed: false })
-      .eq("id", u.id);
+    const { error } = await ctx.db.rpc("start_mining_v1", { _user_id: u.id });
+    if (error) throw new Error(rpcMessage(error, "Mining is already running"));
     return { ok: true };
   });
 
 export const claimMining = createServerFn({ method: "POST" })
-  .inputValidator((d: { initData: string }) => d)
+  .inputValidator(vInit)
   .handler(async ({ data }) => {
     const ctx = await loadCtx(data.initData);
     const { sendMessage } = await import("./telegram.server");
+    await rateLimit(ctx.db, "mine_claim", ctx.tg.id, 10, 60);
     const u = await getUserRow(ctx);
-    if (!u.mining_started_at || u.mining_claimed) throw new Error("Nothing to claim");
 
     const cfg = await getConfig(ctx.db, "mining");
-    const duration = Number(cfg["duration_minutes"] ?? 60) * 60_000;
-    const started = new Date(u.mining_started_at).getTime();
-    if (Date.now() - started < duration) throw new Error("Mining is still running");
-
-    const reward = Number(cfg["reward"] ?? 100);
-    const key = `mining:${u.id}:${u.mining_started_at}`;
-    const marked = await ctx.db
-      .from("app_users")
-      .update({ mining_claimed: true, mining_started_at: null })
-      .eq("id", u.id)
-      .eq("mining_claimed", false)
-      .select("id");
-    if (!marked.data?.length) throw new Error("Already claimed");
-
-    const { data: balance } = await ctx.db.rpc("credit_user", {
+    const res = await ctx.db.rpc("claim_mining_v1", {
       _user_id: u.id,
-      _amount: reward,
-      _kind: "mining",
-      _note: "Hourly mining",
-      _key: key,
+      _duration_minutes: Number(cfg["duration_minutes"] ?? 60),
+      _reward: Number(cfg["reward"] ?? 100),
     });
+    if (res.error) throw new Error(rpcMessage(res.error, "Nothing to claim"));
+    const out = res.data as { reward: number; balance: number };
 
     await sendMessage(
       ctx.tg.id,
-      `⛏️ <b>Mining complete!</b>\n🪙 +${reward} FOX added to your balance.\n🌾 Start a new session to keep farming.`,
+      `⛏️ <b>Mining complete!</b>\n🪙 +${out.reward} FOX added to your balance.\n🌾 Start a new session to keep farming.`,
       [[{ text: "🦊 Open Mini App", url: MINI_APP_URL }]],
     );
 
-    return { reward, balance: Number(balance ?? 0) };
+    return { reward: Number(out.reward), balance: Number(out.balance) };
   });
 
 export const claimDaily = createServerFn({ method: "POST" })
-  .inputValidator((d: { initData: string }) => d)
+  .inputValidator(vInit)
   .handler(async ({ data }) => {
     const ctx = await loadCtx(data.initData);
+    await rateLimit(ctx.db, "daily", ctx.tg.id, 10, 60);
     const u = await getUserRow(ctx);
-    const today = todayUTC();
-    if (u.last_daily_date === today) throw new Error("Already claimed today");
 
     const cfg = await getConfig(ctx.db, "daily");
-    const rewards = ((cfg["rewards"] as number[]) ?? [30, 40, 50, 70, 90, 120, 150]);
+    const rewards = ((cfg["rewards"] as number[]) ?? [30, 40, 50, 70, 90, 120, 150]).map(Number);
 
-    const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
-    const nextDay = u.last_daily_date === yesterday ? (Number(u.streak_day) % rewards.length) + 1 : 1;
-    const reward = rewards[nextDay - 1] ?? rewards[0]!;
-
-    const updated = await ctx.db
-      .from("app_users")
-      .update({ streak_day: nextDay, last_daily_date: today })
-      .eq("id", u.id)
-      .neq("last_daily_date", today)
-      .select("id");
-    if (!updated.data?.length) throw new Error("Already claimed today");
-
-    const { data: balance } = await ctx.db.rpc("credit_user", {
-      _user_id: u.id,
-      _amount: reward,
-      _kind: "daily",
-      _note: `Daily reward day ${nextDay}`,
-      _key: `daily:${u.id}:${today}`,
-    });
-
-    return { reward, day: nextDay, balance: Number(balance ?? 0) };
+    const res = await ctx.db.rpc("claim_daily_v1", { _user_id: u.id, _rewards: rewards });
+    if (res.error) throw new Error(rpcMessage(res.error, "Already claimed today"));
+    const out = res.data as { reward: number; day: number; balance: number };
+    return { reward: Number(out.reward), day: Number(out.day), balance: Number(out.balance) };
   });
 
 export const claimRewardCode = createServerFn({ method: "POST" })
-  .inputValidator((d: { initData: string; code: string }) => d)
+  .inputValidator((d: { initData: string; code: string }) => {
+    if (typeof d?.initData !== "string" || typeof d?.code !== "string") throw new Error("Invalid request");
+    return { initData: d.initData, code: d.code };
+  })
   .handler(async ({ data }) => {
     const ctx = await loadCtx(data.initData);
+    // Brute-force protection: a code is a secret, so guessing is throttled hard.
+    await rateLimit(ctx.db, "code", ctx.tg.id, 8, 3600);
     const u = await getUserRow(ctx);
     const code = data.code.trim().toUpperCase().slice(0, 40);
-    if (!code) throw new Error("Enter a code");
+    if (!/^[A-Z0-9_-]{3,40}$/.test(code)) throw new Error("Invalid code");
 
-    const row = await ctx.db.from("reward_codes").select("*").eq("code", code).maybeSingle();
-    if (!row.data || !row.data.active) throw new Error("Invalid code");
-    if (row.data.expires_at && new Date(row.data.expires_at).getTime() < Date.now()) throw new Error("This code has expired");
-    if (row.data.max_uses > 0 && row.data.uses >= row.data.max_uses) throw new Error("This code is fully used");
-
-    const claim = await ctx.db.from("reward_code_claims").insert({ code, user_id: u.id });
-    if (claim.error) throw new Error("You already used this code");
-
-    await ctx.db.from("reward_codes").update({ uses: row.data.uses + 1 }).eq("code", code);
-
-    const { data: balance } = await ctx.db.rpc("credit_user", {
-      _user_id: u.id,
-      _amount: row.data.amount,
-      _kind: "reward_code",
-      _note: `Reward code ${code}`,
-      _key: `code:${code}:${u.id}`,
-    });
-
-    return { reward: Number(row.data.amount), balance: Number(balance ?? 0) };
+    const res = await ctx.db.rpc("claim_reward_code_v1", { _user_id: u.id, _code: code });
+    if (res.error) throw new Error(rpcMessage(res.error, "Invalid code"));
+    const out = res.data as { reward: number; balance: number };
+    return { reward: Number(out.reward), balance: Number(out.balance) };
   });
 
 /** Daily channel tasks — membership is verified through the bot. */
 export const claimChannelTask = createServerFn({ method: "POST" })
-  .inputValidator((d: { initData: string; kind: "community" | "payment" }) => d)
+  .inputValidator((d: { initData: string; kind: "community" | "payment" }) => {
+    if (typeof d?.initData !== "string") throw new Error("Invalid request");
+    if (d?.kind !== "community" && d?.kind !== "payment") throw new Error("Invalid request");
+    return { initData: d.initData, kind: d.kind };
+  })
   .handler(async ({ data }) => {
     const ctx = await loadCtx(data.initData);
     const { isChatMember } = await import("./telegram.server");
+    await rateLimit(ctx.db, "task", ctx.tg.id, 20, 300);
     const u = await getUserRow(ctx);
     const channels = await getConfig(ctx.db, "channels");
     const chat = String(channels[data.kind === "community" ? "community_chat" : "payment_chat"] ?? "");
