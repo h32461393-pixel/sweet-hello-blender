@@ -70,11 +70,13 @@ function publicUser(u: Record<string, unknown>) {
 
 /** Verifies Telegram identity, creates the account on first open, applies referral. */
 export const syncUser = createServerFn({ method: "POST" })
-  .inputValidator((d: { initData: string }) => d)
+  .inputValidator(vInit)
   .handler(async ({ data }) => {
     const ctx = await loadCtx(data.initData);
+    await rateLimit(ctx.db, "sync", ctx.tg.id, 30, 60);
     const { sendPhoto, sendMessage } = await import("./telegram.server");
     const db = ctx.db;
+
 
     const existing = await db.from("app_users").select("*").eq("telegram_id", ctx.tg.id).maybeSingle();
 
@@ -154,9 +156,10 @@ export const syncUser = createServerFn({ method: "POST" })
 
 /** Everything the home screen needs. */
 export const getHomeState = createServerFn({ method: "POST" })
-  .inputValidator((d: { initData: string }) => d)
+  .inputValidator(vInit)
   .handler(async ({ data }) => {
     const ctx = await loadCtx(data.initData);
+    await rateLimit(ctx.db, "home", ctx.tg.id, 120, 60);
     const u = await getUserRow(ctx);
     const mining = await getConfig(ctx.db, "mining");
     const daily = await getConfig(ctx.db, "daily");
