@@ -1,7 +1,8 @@
 import { createHash, timingSafeEqual } from "crypto";
 import { ADMIN_TELEGRAM_ID } from "./constants";
 
-type Db = { rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }> };
+/* eslint-disable @typescript-eslint/no-explicit-any */
+type Db = { rpc: (fn: any, args?: any) => Promise<{ data: any; error: any }> };
 
 /**
  * Atomic, database-backed rate limit. Throws a user friendly error when the
