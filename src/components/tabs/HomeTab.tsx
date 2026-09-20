@@ -3,6 +3,7 @@ import { Coins, Gift, Pickaxe, Send, Ticket, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { GuideCard, SectionTitle, type TabKey } from "@/components/AppShell";
 import logo from "@/assets/fox-logo.png.asset.json";
+import { assetUrl } from "@/lib/constants";
 import { COMMUNITY_URL, PAYMENT_URL } from "@/lib/constants";
 import { openLink, haptic } from "@/lib/telegram-client";
 import {
@@ -80,7 +81,7 @@ export function HomeTab({ onTab }: { onTab?: (t: TabKey) => void }) {
     <div className="space-y-4">
       {/* user header */}
       <div className="flex items-center gap-3">
-        <img src={u.photoUrl ?? logo.url} alt="" className="h-11 w-11 rounded-full object-cover" />
+        <img src={u.photoUrl ?? assetUrl(logo.url)} alt="" className="h-11 w-11 rounded-full object-cover" />
         <div className="min-w-0">
           <p className="truncate text-sm font-bold">Hi, {u.firstName ?? "farmer"} 👋</p>
           <p className="truncate text-xs text-muted-foreground">

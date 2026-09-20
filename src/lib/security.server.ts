@@ -21,8 +21,12 @@ export async function rateLimit(
     _limit: limit,
     _window_seconds: windowSeconds,
   });
-  // Fail closed: if the limiter itself breaks we refuse the action.
-  if (error) throw new Error("Too many requests. Please try again later.");
+  // Fail closed: if the limiter itself breaks we refuse the action, but say so
+  // clearly instead of blaming the user for sending too many requests.
+  if (error) {
+    console.error("[rateLimit] backend error", error);
+    throw new Error("Server is not connected to the database. Please check the server keys.");
+  }
   if (data === false) throw new Error("Too many requests. Please slow down.");
 }
 
