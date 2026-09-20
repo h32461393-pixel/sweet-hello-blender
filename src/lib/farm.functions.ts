@@ -1,4 +1,29 @@
 import { createServerFn } from "@tanstack/react-start";
+import { rateLimit } from "./security.server";
+
+/** Strict validator: only a session string is accepted from the client. */
+function vInit(d: { initData: string }) {
+  if (typeof d?.initData !== "string" || !d.initData) throw new Error("Invalid session");
+  return { initData: d.initData };
+}
+
+/** Turns a database error into a safe, user facing message. */
+function rpcMessage(error: unknown, fallback: string): string {
+  const msg = (error as { message?: string })?.message ?? "";
+  if (/SUSPENDED/.test(msg)) return "SUSPENDED";
+  const known = [
+    "Already claimed today",
+    "Nothing to claim",
+    "Mining is still running",
+    "Mining is already running",
+    "Invalid code",
+    "This code has expired",
+    "This code is fully used",
+    "You already used this code",
+    "insufficient balance",
+  ];
+  return known.find((k) => msg.includes(k)) ?? fallback;
+}
 import { MINI_APP_URL, COMMUNITY_URL, PAYMENT_URL, ADMIN_TELEGRAM_ID, BANNER_URL } from "./constants";
 
 type Ctx = Awaited<ReturnType<typeof loadCtx>>;
