@@ -3,11 +3,15 @@ import logo from "@/assets/fox-logo.png.asset.json";
 
 type Phase = "loading" | "error" | "done";
 
-export function Splash({ onReady }: { onReady: () => void }) {
+export function Splash({ onReady, run }: { onReady: () => void; run?: () => Promise<void> }) {
   const [phase, setPhase] = useState<Phase>("loading");
   const [progress, setProgress] = useState(0);
   const [message, setMessage] = useState("Waking up the farm…");
   const [attempt, setAttempt] = useState(0);
+  const [errorText, setErrorText] = useState(
+    "We couldn't reach the farm. Check your internet connection and try again.",
+  );
+
 
   useEffect(() => {
     let cancelled = false;
@@ -28,27 +32,35 @@ export function Splash({ onReady }: { onReady: () => void }) {
       setMessage(steps[i]!);
     }, 320);
 
-    const run = async () => {
+    const boot = async () => {
       try {
         if (typeof navigator !== "undefined" && navigator.onLine === false) {
-          throw new Error("offline");
+          throw new Error("You appear to be offline. Check your connection and try again.");
         }
-        await new Promise((r) => window.setTimeout(r, 1600));
+        if (run) await run();
+        else await new Promise((r) => window.setTimeout(r, 1200));
         if (cancelled) return;
         setProgress(100);
         setPhase("done");
         window.setTimeout(() => !cancelled && onReady(), 350);
-      } catch {
-        if (!cancelled) setPhase("error");
+      } catch (e) {
+        if (cancelled) return;
+        setErrorText(
+          e instanceof Error && e.message
+            ? e.message
+            : "We couldn't reach the farm. Check your internet connection and try again.",
+        );
+        setPhase("error");
       }
     };
-    void run();
+    void boot();
 
     return () => {
       cancelled = true;
       window.clearInterval(tick);
     };
-  }, [attempt, onReady]);
+  }, [attempt, onReady, run]);
+
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background px-6 text-center">
@@ -61,10 +73,9 @@ export function Splash({ onReady }: { onReady: () => void }) {
       {phase === "error" ? (
         <div className="mt-8 w-full max-w-xs rounded-2xl border border-destructive/30 bg-card p-5 shadow-sm">
           <p className="text-2xl">📡</p>
-          <h2 className="mt-2 font-bold text-destructive">Network error</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            We couldn't reach the farm. Check your internet connection and try again.
-          </p>
+          <h2 className="mt-2 font-bold text-destructive">Something went wrong</h2>
+          <p className="mt-1 text-sm text-muted-foreground">{errorText}</p>
+
           <button
             onClick={() => setAttempt((a) => a + 1)}
             className="mt-4 w-full rounded-xl bg-primary px-4 py-2.5 font-semibold text-primary-foreground transition hover:brightness-105 active:scale-[0.98]"
