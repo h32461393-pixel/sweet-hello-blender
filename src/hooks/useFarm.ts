@@ -10,6 +10,8 @@ import {
   claimChannelTask,
   getAdsState,
   claimAdView,
+  getProfileState,
+  setWallet,
 } from "@/lib/farm.functions";
 import { getInitData } from "@/lib/telegram-client";
 
@@ -78,6 +80,31 @@ export function useClaimAdView() {
     onSettled: () => {
       qc.invalidateQueries({ queryKey: HOME_KEY });
       qc.invalidateQueries({ queryKey: ["ads-state"] });
+    },
+  });
+}
+
+export const PROFILE_KEY = ["profile-state"];
+
+export function useProfileState(enabled = true) {
+  const fn = useServerFn(getProfileState);
+  return useQuery({
+    queryKey: PROFILE_KEY,
+    queryFn: () => fn({ data: { initData: getInitData() } }),
+    enabled,
+    refetchOnWindowFocus: true,
+    retry: 1,
+  });
+}
+
+export function useSetWallet() {
+  const qc = useQueryClient();
+  const fn = useServerFn(setWallet);
+  return useMutation({
+    mutationFn: (address: string) => fn({ data: { initData: getInitData(), address } }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: PROFILE_KEY });
+      qc.invalidateQueries({ queryKey: HOME_KEY });
     },
   });
 }
