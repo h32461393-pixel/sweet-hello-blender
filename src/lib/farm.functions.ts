@@ -389,6 +389,79 @@ export const claimAdView = createServerFn({ method: "POST" })
     };
   });
 
+/** Profile screen: user, recent transactions and referral overview. */
+export const getProfileState = createServerFn({ method: "POST" })
+  .inputValidator(vInit)
+  .handler(async ({ data }) => {
+    const ctx = await loadCtx(data.initData);
+    await rateLimit(ctx.db, "profile", ctx.tg.id, 60, 60);
+    const u = await getUserRow(ctx);
+
+    const [tx, refs] = await Promise.all([
+      ctx.db
+        .from("transactions")
+        .select("id, kind, amount, note, created_at")
+        .eq("user_id", u.id)
+        .order("created_at", { ascending: false })
+        .limit(30),
+      ctx.db
+        .from("referrals")
+        .select("id, status, pending_reward, stage_join, stage_day1, stage_day2, fake, created_at, app_users!referrals_referee_id_fkey(username, first_name)")
+        .eq("referrer_id", u.id)
+        .order("created_at", { ascending: false })
+        .limit(50),
+    ]);
+
+    const refList = refs.data ?? [];
+    return {
+      user: publicUser(u),
+      transactions: (tx.data ?? []).map((r) => ({
+        id: r.id as string,
+        kind: r.kind as string,
+        amount: Number(r.amount ?? 0),
+        note: (r.note as string) ?? null,
+        at: r.created_at as string,
+      })),
+      referrals: {
+        count: refList.length,
+        pendingTotal: refList.reduce((n, r) => n + (r.status === "pending" ? Number(r.pending_reward ?? 0) : 0), 0),
+        list: refList.map((r) => {
+          const ru = (r as { app_users?: { username?: string | null; first_name?: string | null } }).app_users;
+          return {
+            id: r.id as string,
+            name: ru?.username ? `@${ru.username}` : (ru?.first_name ?? "Fox farmer"),
+            status: r.status as string,
+            pending: Number(r.pending_reward ?? 0),
+            stages: { join: !!r.stage_join, day1: !!r.stage_day1, day2: !!r.stage_day2 },
+            fake: !!r.fake,
+            at: r.created_at as string,
+          };
+        }),
+      },
+    };
+  });
+
+/** Save the user's USDT BEP-20 withdrawal address. */
+export const setWallet = createServerFn({ method: "POST" })
+  .inputValidator((d: { initData: string; address: string }) => {
+    if (typeof d?.initData !== "string" || !d.initData) throw new Error("Invalid session");
+    if (typeof d?.address !== "string") throw new Error("Invalid address");
+    return { initData: d.initData, address: d.address.trim() };
+  })
+  .handler(async ({ data }) => {
+    const ctx = await loadCtx(data.initData);
+    await rateLimit(ctx.db, "wallet", ctx.tg.id, 10, 60);
+    const u = await getUserRow(ctx);
+
+    if (!/^0x[a-fA-F0-9]{40}$/.test(data.address)) {
+      throw new Error("Enter a valid BEP-20 address starting with 0x");
+    }
+
+    const { error } = await ctx.db.from("app_users").update({ wallet_address: data.address }).eq("id", u.id);
+    if (error) throw new Error("Could not save the address");
+    return { ok: true, address: data.address };
+  });
+
 /** Public proof of payouts: paid withdrawals and a top earners leaderboard. */
 export const getPayoutProof = createServerFn({ method: "GET" }).handler(async () => {
   const { supabaseAdmin: db } = await import("@/integrations/supabase/client.server");
