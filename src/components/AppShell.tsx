@@ -1,15 +1,16 @@
-import { useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { Home, ListChecks, Play, Users, User } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { t, useLang } from "@/lib/i18n";
 
 export type TabKey = "home" | "tasks" | "ads" | "refer" | "profile";
 
-const TABS: { key: TabKey; label: string; icon: typeof Home }[] = [
-  { key: "home", label: "Farm", icon: Home },
-  { key: "tasks", label: "Tasks", icon: ListChecks },
-  { key: "ads", label: "Ads", icon: Play },
-  { key: "refer", label: "Refer", icon: Users },
-  { key: "profile", label: "Profile", icon: User },
+const TABS: { key: TabKey; labelKey: string; icon: typeof Home }[] = [
+  { key: "home", labelKey: "farm", icon: Home },
+  { key: "tasks", labelKey: "tasks", icon: ListChecks },
+  { key: "ads", labelKey: "ads", icon: Play },
+  { key: "refer", labelKey: "refer", icon: Users },
+  { key: "profile", labelKey: "profile", icon: User },
 ];
 
 export function AppShell({
