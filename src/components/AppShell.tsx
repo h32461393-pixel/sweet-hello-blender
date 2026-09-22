@@ -29,7 +29,7 @@ export function AppShell({
 
       <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto max-w-md border-t border-border bg-card/95 px-2 pb-[env(safe-area-inset-bottom)] backdrop-blur">
         <ul className="flex items-end justify-between">
-          {TABS.map(({ key, label, icon: Icon }) => {
+          {TABS.map(({ key, labelKey, icon: Icon }) => {
             const active = tab === key;
             const center = key === "ads";
             return (
@@ -53,7 +53,7 @@ export function AppShell({
                   >
                     <Icon className={center ? "h-7 w-7" : "h-5 w-5"} />
                   </span>
-                  {label}
+                  {t(lang, labelKey)}
                 </button>
               </li>
             );
