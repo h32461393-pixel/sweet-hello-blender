@@ -1,15 +1,16 @@
-import { useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { Home, ListChecks, Play, Users, User } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { t, useLang } from "@/lib/i18n";
 
 export type TabKey = "home" | "tasks" | "ads" | "refer" | "profile";
 
-const TABS: { key: TabKey; label: string; icon: typeof Home }[] = [
-  { key: "home", label: "Farm", icon: Home },
-  { key: "tasks", label: "Tasks", icon: ListChecks },
-  { key: "ads", label: "Ads", icon: Play },
-  { key: "refer", label: "Refer", icon: Users },
-  { key: "profile", label: "Profile", icon: User },
+const TABS: { key: TabKey; labelKey: string; icon: typeof Home }[] = [
+  { key: "home", labelKey: "farm", icon: Home },
+  { key: "tasks", labelKey: "tasks", icon: ListChecks },
+  { key: "ads", labelKey: "ads", icon: Play },
+  { key: "refer", labelKey: "refer", icon: Users },
+  { key: "profile", labelKey: "profile", icon: User },
 ];
 
 export function AppShell({
@@ -21,13 +22,14 @@ export function AppShell({
   onTab: (t: TabKey) => void;
   children: ReactNode;
 }) {
+  const lang = useLang();
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-background">
       <main className="flex-1 px-4 pb-28 pt-4">{children}</main>
 
       <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto max-w-md border-t border-border bg-card/95 px-2 pb-[env(safe-area-inset-bottom)] backdrop-blur">
         <ul className="flex items-end justify-between">
-          {TABS.map(({ key, label, icon: Icon }) => {
+          {TABS.map(({ key, labelKey, icon: Icon }) => {
             const active = tab === key;
             const center = key === "ads";
             return (
@@ -51,7 +53,7 @@ export function AppShell({
                   >
                     <Icon className={center ? "h-7 w-7" : "h-5 w-5"} />
                   </span>
-                  {label}
+                  {t(lang, labelKey)}
                 </button>
               </li>
             );

@@ -43,7 +43,7 @@ function Row({
   label: string;
   href?: string;
   onClick?: () => void;
-  trailing?: string;
+  trailing?: string | undefined;
 }) {
   const inner = (
     <div className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3.5 text-sm font-semibold active:scale-[0.99]">
