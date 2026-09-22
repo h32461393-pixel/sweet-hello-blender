@@ -349,6 +349,7 @@ export type Database = {
           active: boolean
           chat_username: string | null
           created_at: string
+          icon_url: string | null
           id: string
           reward: number
           section: string
@@ -361,6 +362,7 @@ export type Database = {
           active?: boolean
           chat_username?: string | null
           created_at?: string
+          icon_url?: string | null
           id?: string
           reward?: number
           section?: string
@@ -373,6 +375,7 @@ export type Database = {
           active?: boolean
           chat_username?: string | null
           created_at?: string
+          icon_url?: string | null
           id?: string
           reward?: number
           section?: string
@@ -501,6 +504,18 @@ export type Database = {
         Args: { _code: string; _user_id: string }
         Returns: Json
       }
+      create_withdrawal_v1: {
+        Args: {
+          _fee_flat: number
+          _fee_percent: number
+          _first_min: number
+          _next_min: number
+          _tokens: number
+          _tokens_per_usd: number
+          _user_id: string
+        }
+        Returns: Json
+      }
       credit_user: {
         Args: {
           _amount: number
@@ -520,6 +535,10 @@ export type Database = {
           _user_id: string
         }
         Returns: number
+      }
+      process_withdrawal_v1: {
+        Args: { _action: string; _txid: string; _withdrawal_id: string }
+        Returns: Json
       }
       rl_hit: {
         Args: {
