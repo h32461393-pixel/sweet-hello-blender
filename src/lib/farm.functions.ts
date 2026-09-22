@@ -309,21 +309,41 @@ export const CHANNEL_LINKS = { community: COMMUNITY_URL, payment: PAYMENT_URL };
  * and a reward is only paid after the ad provider reports a completed view.
  * ------------------------------------------------------------------------- */
 
+export const AD_SOURCES = ["adsgram", "adsgram_int", "monetag", "gigapub"] as const;
+export type AdSource = (typeof AD_SOURCES)[number];
+
+type NetworkCfg = { label: string; reward: number; cap: number; cooldown: number; logo: string };
 type AdsConfig = {
-  adReward: number;
-  adDailyCap: number;
-  adCooldownSeconds: number;
+  networks: Record<string, NetworkCfg>;
   siteReward: number;
   siteDailyCap: number;
   siteCooldownSeconds: number;
 };
 
+const DEFAULT_NETWORKS: Record<AdSource, NetworkCfg> = {
+  adsgram: { label: "Adsgram Reward", reward: 40, cap: 10, cooldown: 30, logo: "" },
+  adsgram_int: { label: "Adsgram Interstitial", reward: 40, cap: 10, cooldown: 30, logo: "" },
+  monetag: { label: "Monetag", reward: 30, cap: 10, cooldown: 30, logo: "" },
+  gigapub: { label: "GigaPub", reward: 30, cap: 10, cooldown: 30, logo: "" },
+};
+
 async function adsConfig(db: Ctx["db"]): Promise<AdsConfig> {
-  const c = await getConfig(db, "ads");
+  const c = (await getConfig(db, "ads")) as unknown as Record<string, unknown>;
+  const raw = (c["networks"] ?? {}) as Record<string, Partial<NetworkCfg>>;
+  const networks: Record<string, NetworkCfg> = {};
+  for (const id of AD_SOURCES) {
+    const d = DEFAULT_NETWORKS[id];
+    const n = raw[id] ?? {};
+    networks[id] = {
+      label: String(n.label ?? d.label),
+      reward: Number(n.reward ?? d.reward),
+      cap: Number(n.cap ?? d.cap),
+      cooldown: Number(n.cooldown ?? d.cooldown),
+      logo: String(n.logo ?? ""),
+    };
+  }
   return {
-    adReward: Number(c["ad_reward"] ?? 5),
-    adDailyCap: Number(c["ad_daily_cap"] ?? 25),
-    adCooldownSeconds: Number(c["ad_cooldown_seconds"] ?? 30),
+    networks,
     siteReward: Number(c["site_reward"] ?? 10),
     siteDailyCap: Number(c["site_daily_cap"] ?? 4),
     siteCooldownSeconds: Number(c["site_cooldown_seconds"] ?? 60),
@@ -353,31 +373,39 @@ export const getAdsState = createServerFn({ method: "POST" })
     return {
       balance: Number(u.balance ?? 0),
       earnedToday,
-      ad: { reward: cfg.adReward, used: count("adsgram"), cap: cfg.adDailyCap },
+      networks: AD_SOURCES.map((id) => ({
+        id,
+        label: cfg.networks[id]!.label,
+        reward: cfg.networks[id]!.reward,
+        cap: cfg.networks[id]!.cap,
+        logo: cfg.networks[id]!.logo,
+        used: count(id),
+      })),
       site: { reward: cfg.siteReward, used: count("site"), cap: cfg.siteDailyCap },
     };
   });
 
 /** Called only after the provider confirms the view; the server re-checks everything. */
 export const claimAdView = createServerFn({ method: "POST" })
-  .inputValidator((d: { initData: string; source: "adsgram" | "site" }) => {
+  .inputValidator((d: { initData: string; source: AdSource | "site" }) => {
     if (typeof d?.initData !== "string" || !d.initData) throw new Error("Invalid session");
-    if (d?.source !== "adsgram" && d?.source !== "site") throw new Error("Invalid request");
+    const ok = d?.source === "site" || (AD_SOURCES as readonly string[]).includes(d?.source);
+    if (!ok) throw new Error("Invalid request");
     return { initData: d.initData, source: d.source };
   })
   .handler(async ({ data }) => {
     const ctx = await loadCtx(data.initData);
-    await rateLimit(ctx.db, "ad_claim", ctx.tg.id, 40, 3600);
+    await rateLimit(ctx.db, "ad_claim", ctx.tg.id, 80, 3600);
     const u = await getUserRow(ctx);
     const cfg = await adsConfig(ctx.db);
-    const isAd = data.source === "adsgram";
+    const net = data.source === "site" ? null : cfg.networks[data.source];
 
     const res = await ctx.db.rpc("claim_ad_view_v1", {
       _user_id: u.id,
       _source: data.source,
-      _reward: isAd ? cfg.adReward : cfg.siteReward,
-      _daily_cap: isAd ? cfg.adDailyCap : cfg.siteDailyCap,
-      _cooldown_seconds: isAd ? cfg.adCooldownSeconds : cfg.siteCooldownSeconds,
+      _reward: net ? net.reward : cfg.siteReward,
+      _daily_cap: net ? net.cap : cfg.siteDailyCap,
+      _cooldown_seconds: net ? net.cooldown : cfg.siteCooldownSeconds,
     });
     if (res.error) throw new Error(rpcMessage(res.error, "Could not verify this view"));
     const out = res.data as { reward: number; balance: number; used: number; cap: number };
