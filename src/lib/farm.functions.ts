@@ -30,8 +30,6 @@ function rpcMessage(error: unknown, fallback: string): string {
   ];
   const min = msg.match(/Minimum withdrawal is [\d,.]+ FOX/);
   if (min) return min[0];
-  const more = [
-  ];
   return known.find((k) => msg.includes(k)) ?? fallback;
 }
 import { MINI_APP_URL, COMMUNITY_URL, PAYMENT_URL, ADMIN_TELEGRAM_ID, BANNER_URL } from "./constants";
