@@ -431,7 +431,15 @@ export const getProfileState = createServerFn({ method: "POST" })
     await rateLimit(ctx.db, "profile", ctx.tg.id, 60, 60);
     const u = await getUserRow(ctx);
 
-    const [tx, refs] = await Promise.all([
+    const referralCfg = await getConfig(ctx.db, "referral");
+    const refreshed = await ctx.db.rpc("refresh_referral_stages_v1", {
+      _referrer_id: u.id,
+      _day1_reward: Number(referralCfg["day1"] ?? 400),
+      _day2_reward: Number(referralCfg["day2"] ?? 600),
+    });
+    if (refreshed.error) throw new Error("Could not refresh referral rewards");
+
+    const [tx, refs, referralTx] = await Promise.all([
       ctx.db
         .from("transactions")
         .select("id, kind, amount, note, created_at")
@@ -444,6 +452,7 @@ export const getProfileState = createServerFn({ method: "POST" })
         .eq("referrer_id", u.id)
         .order("created_at", { ascending: false })
         .limit(50),
+      ctx.db.from("transactions").select("amount").eq("user_id", u.id).eq("kind", "referral"),
     ]);
 
     const refList = refs.data ?? [];
@@ -458,7 +467,9 @@ export const getProfileState = createServerFn({ method: "POST" })
       })),
       referrals: {
         count: refList.length,
+        active: refList.filter((r) => !r.fake).length,
         pendingTotal: refList.reduce((n, r) => n + (r.status === "pending" ? Number(r.pending_reward ?? 0) : 0), 0),
+        earnedTotal: (referralTx.data ?? []).reduce((n, r) => n + Number(r.amount ?? 0), 0),
         list: refList.map((r) => {
           const ru = (r as { app_users?: { username?: string | null; first_name?: string | null } }).app_users;
           return {
@@ -473,6 +484,24 @@ export const getProfileState = createServerFn({ method: "POST" })
         }),
       },
     };
+  });
+
+/** Claims every currently eligible referral reward in one locked transaction. */
+export const claimReferralRewards = createServerFn({ method: "POST" })
+  .inputValidator(vInit)
+  .handler(async ({ data }) => {
+    const ctx = await loadCtx(data.initData);
+    await rateLimit(ctx.db, "ref_claim", ctx.tg.id, 10, 60);
+    const u = await getUserRow(ctx);
+    const cfg = await getConfig(ctx.db, "referral");
+    const res = await ctx.db.rpc("claim_referral_rewards_v1", {
+      _referrer_id: u.id,
+      _day1_reward: Number(cfg["day1"] ?? 400),
+      _day2_reward: Number(cfg["day2"] ?? 600),
+    });
+    if (res.error) throw new Error(rpcMessage(res.error, "Could not claim referral rewards"));
+    const out = res.data as { reward: number; balance: number };
+    return { reward: Number(out.reward), balance: Number(out.balance) };
   });
 
 /** Save the user's USDT BEP-20 withdrawal address. */

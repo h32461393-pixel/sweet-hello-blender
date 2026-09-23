@@ -24,10 +24,11 @@ export function AppShell({
 }) {
   const lang = useLang();
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-background">
+    <div className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-background shadow-2xl shadow-foreground/10">
+      <div className="h-1.5 bg-primary" />
       <main className="flex-1 px-4 pb-28 pt-4">{children}</main>
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto max-w-md border-t border-border bg-card/95 px-2 pb-[env(safe-area-inset-bottom)] backdrop-blur">
+      <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto max-w-md border-t border-border bg-card/95 px-2 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_-16px_var(--foreground)] backdrop-blur">
         <ul className="flex items-end justify-between">
           {TABS.map(({ key, labelKey, icon: Icon }) => {
             const active = tab === key;

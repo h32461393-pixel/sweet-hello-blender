@@ -145,26 +145,26 @@
 
 /* ---- Fox Farm theme ---- */
 :root {
-  --background: oklch(0.97 0.03 110);
-  --foreground: oklch(0.26 0.05 60);
-  --card: oklch(0.99 0.015 95);
-  --card-foreground: oklch(0.26 0.05 60);
-  --popover: oklch(0.99 0.015 95);
-  --popover-foreground: oklch(0.26 0.05 60);
-  --primary: oklch(0.7 0.19 45);
-  --primary-foreground: oklch(0.99 0.01 90);
-  --secondary: oklch(0.92 0.06 120);
-  --secondary-foreground: oklch(0.3 0.06 130);
-  --muted: oklch(0.94 0.03 110);
-  --muted-foreground: oklch(0.5 0.04 90);
-  --accent: oklch(0.83 0.16 90);
-  --accent-foreground: oklch(0.28 0.06 60);
+  --background: oklch(0.955 0.028 150);
+  --foreground: oklch(0.24 0.045 145);
+  --card: oklch(0.995 0.008 100);
+  --card-foreground: oklch(0.24 0.045 145);
+  --popover: oklch(0.995 0.008 100);
+  --popover-foreground: oklch(0.24 0.045 145);
+  --primary: oklch(0.66 0.205 42);
+  --primary-foreground: oklch(0.995 0.005 90);
+  --secondary: oklch(0.9 0.075 150);
+  --secondary-foreground: oklch(0.28 0.08 150);
+  --muted: oklch(0.925 0.025 155);
+  --muted-foreground: oklch(0.47 0.045 145);
+  --accent: oklch(0.84 0.15 88);
+  --accent-foreground: oklch(0.26 0.065 65);
   --destructive: oklch(0.58 0.23 27);
   --destructive-foreground: oklch(0.98 0.01 90);
-  --border: oklch(0.88 0.04 100);
-  --input: oklch(0.88 0.04 100);
-  --ring: oklch(0.7 0.19 45);
-  --usdt: oklch(0.6 0.13 165);
+  --border: oklch(0.84 0.055 145);
+  --input: oklch(0.84 0.055 145);
+  --ring: oklch(0.66 0.205 42);
+  --usdt: oklch(0.57 0.145 160);
   --usdt-foreground: oklch(0.98 0.01 165);
   --barn: oklch(0.45 0.16 30);
   --wood: oklch(0.42 0.07 60);
@@ -201,3 +201,7 @@
 @keyframes fox-bob { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-10px) } }
 @keyframes fox-shine { 0% { background-position: -200% 0 } 100% { background-position: 200% 0 } }
 @utility animate-fox-bob { animation: fox-bob 2s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fox-bob { animation: none; }
+}
