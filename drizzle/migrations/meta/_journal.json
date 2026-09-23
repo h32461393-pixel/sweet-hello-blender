@@ -29,6 +29,13 @@
       "when": 1790097362009,
       "tag": "0003_ads_networks_and_withdrawals",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790139055466,
+      "tag": "0004_secure_referral_reward_claims",
+      "breakpoints": true
     }
   ]
 }

@@ -500,6 +500,14 @@ export type Database = {
         Args: { _duration_minutes: number; _reward: number; _user_id: string }
         Returns: Json
       }
+      claim_referral_rewards_v1: {
+        Args: {
+          _day1_reward: number
+          _day2_reward: number
+          _referrer_id: string
+        }
+        Returns: Json
+      }
       claim_reward_code_v1: {
         Args: { _code: string; _user_id: string }
         Returns: Json
@@ -539,6 +547,14 @@ export type Database = {
       process_withdrawal_v1: {
         Args: { _action: string; _txid: string; _withdrawal_id: string }
         Returns: Json
+      }
+      refresh_referral_stages_v1: {
+        Args: {
+          _day1_reward: number
+          _day2_reward: number
+          _referrer_id: string
+        }
+        Returns: undefined
       }
       rl_hit: {
         Args: {
