@@ -75,7 +75,9 @@ export function useClaimAdView() {
   const qc = useQueryClient();
   const fn = useServerFn(claimAdView);
   return useMutation({
-    mutationFn: (args: { source: "adsgram" | "site" }) =>
+    mutationFn: (args: {
+      source: "adsgram" | "adsgram_int" | "monetag" | "gigapub" | "site";
+    }) =>
       fn({ data: { ...args, initData: getInitData() } }),
     onSettled: () => {
       qc.invalidateQueries({ queryKey: HOME_KEY });
