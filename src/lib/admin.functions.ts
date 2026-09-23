@@ -223,7 +223,7 @@ export const adminProcessWithdrawal = createServerFn({ method: "POST" })
     const { sendMessage } = await import("./telegram.server");
 
     const res = await ctx.db.rpc("process_withdrawal_v1", {
-      _id: data.id,
+      _withdrawal_id: data.id,
       _action: data.action,
       _txid: (data.action === "paid" ? data.txid : "") as string,
     });
