@@ -17,4 +17,6 @@
 
 ## Open
 - [x] Store ADMIN_PANEL_USER / ADMIN_PANEL_PASSWORD as encrypted server secrets
+- [x] Build real referral data, personal invite links, history and secure reward claims
+- [x] Refresh the app palette and navigation surface
 - Rotate the bot token and keys that were pasted in chat

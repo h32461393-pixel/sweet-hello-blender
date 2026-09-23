@@ -16,6 +16,7 @@ import {
   createWithdrawal,
   getTasks,
   claimTask,
+  claimReferralRewards,
 } from "@/lib/farm.functions";
 import { getInitData } from "@/lib/telegram-client";
 
@@ -108,6 +109,18 @@ export function useSetWallet() {
   const fn = useServerFn(setWallet);
   return useMutation({
     mutationFn: (address: string) => fn({ data: { initData: getInitData(), address } }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: PROFILE_KEY });
+      qc.invalidateQueries({ queryKey: HOME_KEY });
+    },
+  });
+}
+
+export function useClaimReferralRewards() {
+  const qc = useQueryClient();
+  const fn = useServerFn(claimReferralRewards);
+  return useMutation({
+    mutationFn: () => fn({ data: { initData: getInitData() } }),
     onSettled: () => {
       qc.invalidateQueries({ queryKey: PROFILE_KEY });
       qc.invalidateQueries({ queryKey: HOME_KEY });
