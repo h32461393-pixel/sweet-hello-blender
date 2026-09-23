@@ -225,7 +225,7 @@ export const adminProcessWithdrawal = createServerFn({ method: "POST" })
     const res = await ctx.db.rpc("process_withdrawal_v1", {
       _id: data.id,
       _action: data.action,
-      _txid: data.action === "paid" ? data.txid : null,
+      _txid: (data.action === "paid" ? data.txid : "") as string,
     });
     if (res.error) throw new Error("Could not process this withdrawal");
 
@@ -277,7 +277,7 @@ export const adminGetConfig = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const ctx = await adminCtx(data);
     const { data: row } = await ctx.db.from("app_config").select("value").eq("key", data.key).maybeSingle();
-    return { value: (row?.value ?? {}) as Record<string, unknown> };
+    return { json: JSON.stringify(row?.value ?? {}) };
   });
 
 export const adminSetConfig = createServerFn({ method: "POST" })
@@ -293,9 +293,9 @@ export const adminSetConfig = createServerFn({ method: "POST" })
     const ctx = await adminCtx(data);
     const { error } = await ctx.db
       .from("app_config")
-      .upsert({ key: data.key, value: data.value }, { onConflict: "key" });
+      .upsert({ key: data.key, value: data.value as never }, { onConflict: "key" });
     if (error) throw new Error("Could not save settings");
-    await audit(ctx, "config_set", data.key, { value: data.value });
+    await audit(ctx, "config_set", data.key, { value: data.value as never });
     return { ok: true };
   });
 
@@ -399,7 +399,7 @@ export const adminCreateCode = createServerFn({ method: "POST" })
     const ctx = await adminCtx(data);
     const { error } = await ctx.db
       .from("reward_codes")
-      .insert({ code: data.code, reward: data.reward, max_uses: data.maxUses });
+      .insert({ code: data.code, amount: data.reward, max_uses: data.maxUses });
     if (error) throw new Error("This code already exists");
     await audit(ctx, "code_create", data.code, { reward: data.reward, maxUses: data.maxUses });
     return { ok: true };
