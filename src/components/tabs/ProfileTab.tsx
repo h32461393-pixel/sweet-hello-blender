@@ -1,12 +1,18 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { SectionTitle } from "@/components/AppShell";
-import { friendlyError, useProfileState, useSetWallet } from "@/hooks/useFarm";
+import {
+  friendlyError,
+  useCreateWithdrawal,
+  useProfileState,
+  useSetWallet,
+  useWithdrawState,
+} from "@/hooks/useFarm";
 import { getPayoutProof } from "@/lib/farm.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { LANGS, setLang, t, useLang, type LangCode } from "@/lib/i18n";
-import { COMMUNITY_URL, MINI_APP_URL, PAYMENT_URL } from "@/lib/constants";
+import { COMMUNITY_URL, MINI_APP_URL, PAYMENT_URL, PUBLIC_APP_URL } from "@/lib/constants";
 import { openLink } from "@/lib/telegram-client";
 import {
   ArrowLeft,
@@ -20,6 +26,8 @@ import {
   Trophy,
   Users,
   Wallet,
+  Banknote,
+  ShieldCheck,
 } from "lucide-react";
 
 type Screen =
@@ -88,6 +96,10 @@ export function ProfileTab() {
     staleTime: 60_000,
   });
 
+  const wd = useWithdrawState(screen === "withdraw");
+  const wdMut = useCreateWithdrawal();
+  const [wdInput, setWdInput] = useState("");
+
   const [walletInput, setWalletInput] = useState<string | null>(null);
   const [notify, setNotify] = useState<boolean>(() =>
     typeof window === "undefined" ? true : window.localStorage.getItem(NOTIFY_KEY) !== "off",
@@ -134,6 +146,124 @@ export function ProfileTab() {
         >
           {walletMut.isPending ? "…" : t(lang, "save")}
         </button>
+      </div>
+    );
+  }
+
+  if (screen === "withdraw") {
+    const w = wd.data;
+    const tokens = Math.floor(Number(wdInput) || 0);
+    const gross = w ? tokens / w.tokensPerUsd : 0;
+    const fee = w ? w.feeFlat + (gross * w.feePercent) / 100 : 0;
+    const net = Math.max(0, gross - fee);
+    const canSend =
+      !!w && !w.hasPending && !!w.walletAddress && tokens >= w.minTokens && tokens <= w.balance;
+
+    return (
+      <div>
+        <SubHeader title={t(lang, "back")} onBack={() => setScreen("main")} />
+        <SectionTitle>💸 Withdraw USDT</SectionTitle>
+
+        {wd.isLoading || !w ? (
+          <p className="text-sm text-muted-foreground">Loading…</p>
+        ) : (
+          <>
+            <div className="rounded-3xl border border-border bg-card p-4">
+              <p className="text-xs text-muted-foreground">Available</p>
+              <p className="text-2xl font-black text-primary">
+                {w.balance.toLocaleString()} FOX
+              </p>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Minimum {w.minTokens.toLocaleString()} FOX · {w.tokensPerUsd.toLocaleString()} FOX =
+                $1 · fee ${w.feeFlat} + {w.feePercent}%
+              </p>
+
+              {!w.walletAddress ? (
+                <button
+                  onClick={() => setScreen("wallet")}
+                  className="mt-3 w-full rounded-2xl bg-secondary p-3 text-sm font-bold text-secondary-foreground"
+                >
+                  Add your USDT (BEP-20) address first
+                </button>
+              ) : (
+                <p className="mt-2 truncate font-mono text-[11px] text-muted-foreground">
+                  {w.walletAddress}
+                </p>
+              )}
+
+              <input
+                value={wdInput}
+                onChange={(e) => setWdInput(e.target.value.replace(/[^0-9]/g, ""))}
+                inputMode="numeric"
+                placeholder={`${w.minTokens}`}
+                className="mt-3 w-full rounded-2xl border border-border bg-background p-3.5 text-sm outline-none focus:border-primary"
+              />
+              <div className="mt-2 flex justify-between text-xs text-muted-foreground">
+                <span>Fee ${fee.toFixed(4)}</span>
+                <span className="font-bold text-foreground">You get ${net.toFixed(4)}</span>
+              </div>
+
+              {w.hasPending ? (
+                <p className="mt-3 rounded-2xl bg-muted p-3 text-center text-xs font-semibold">
+                  ⏳ You already have a pending withdrawal.
+                </p>
+              ) : (
+                <button
+                  disabled={!canSend || wdMut.isPending}
+                  onClick={() =>
+                    wdMut.mutate(tokens, {
+                      onSuccess: (r) => {
+                        setWdInput("");
+                        toast.success(`💸 Request sent · $${r.net.toFixed(4)}`);
+                      },
+                      onError: (e) => toast.error(friendlyError(e)),
+                    })
+                  }
+                  className="mt-3 w-full rounded-2xl bg-primary p-3.5 text-sm font-extrabold text-primary-foreground disabled:opacity-50"
+                >
+                  {wdMut.isPending ? "…" : "Request withdrawal"}
+                </button>
+              )}
+            </div>
+
+            <SectionTitle>History</SectionTitle>
+            {w.history.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No withdrawals yet.</p>
+            ) : (
+              <ul className="space-y-2">
+                {w.history.map((h) => (
+                  <li
+                    key={h.id}
+                    className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3 text-sm"
+                  >
+                    <span className="text-lg">
+                      {h.status === "paid" ? "✅" : h.status === "rejected" ? "❌" : "⏳"}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold">
+                        {h.tokens.toLocaleString()} FOX · ${h.net.toFixed(4)}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {new Date(h.at).toLocaleString()}
+                        {h.txid ? " · paid" : ""}
+                      </p>
+                    </div>
+                    {h.txid ? (
+                      <button
+                        onClick={() => openLink(`https://bscscan.com/tx/${h.txid}`)}
+                        className="text-xs font-bold text-primary"
+                      >
+                        View
+                      </button>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">{h.status}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        )}
       </div>
     );
   }
@@ -343,6 +473,7 @@ export function ProfileTab() {
 
       <SectionTitle>{t(lang, "finance")}</SectionTitle>
       <Row icon={Wallet} label={t(lang, "wallet")} onClick={() => setScreen("wallet")} trailing={u.walletAddress ? "✓" : undefined} />
+      <Row icon={Banknote} label="Withdraw USDT" onClick={() => setScreen("withdraw")} />
       <Row icon={ArrowLeftRight} label={t(lang, "transactions")} onClick={() => setScreen("transactions")} />
 
       <SectionTitle>{t(lang, "social")}</SectionTitle>
@@ -352,6 +483,11 @@ export function ProfileTab() {
       <SectionTitle>{t(lang, "community")}</SectionTitle>
       <Row icon={MessageCircle} label={t(lang, "communityChannel")} href={COMMUNITY_URL} />
       <Row icon={MessageCircle} label={t(lang, "paymentChannel")} href={PAYMENT_URL} />
+      <Row
+        icon={ShieldCheck}
+        label="Public payout proof"
+        onClick={() => openLink(`${PUBLIC_APP_URL}/payouts`)}
+      />
 
       <SectionTitle>{t(lang, "preferences")}</SectionTitle>
       <Row icon={Bell} label={t(lang, "notifications")} onClick={() => setScreen("notifications")} trailing={notify ? "On" : "Off"} />
