@@ -36,6 +36,13 @@
       "when": 1790139055466,
       "tag": "0004_secure_referral_reward_claims",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790139080929,
+      "tag": "0005_fix_referral_claim_row_lock",
+      "breakpoints": true
     }
   ]
 }
