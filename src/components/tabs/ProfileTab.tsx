@@ -25,6 +25,7 @@ import {
 type Screen =
   | "main"
   | "wallet"
+  | "withdraw"
   | "transactions"
   | "refer"
   | "leaderboard"
