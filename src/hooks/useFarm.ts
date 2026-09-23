@@ -12,6 +12,8 @@ import {
   claimAdView,
   getProfileState,
   setWallet,
+  getWithdrawState,
+  createWithdrawal,
 } from "@/lib/farm.functions";
 import { getInitData } from "@/lib/telegram-client";
 
@@ -117,4 +119,30 @@ export function friendlyError(e: unknown): string {
   if (msg.includes("NOT_JOINED")) return "Please join the channel first, then try again.";
   if (!msg || msg.includes("fetch") || msg.includes("Failed")) return "Network error. Please try again.";
   return msg;
+}
+
+export const WITHDRAW_KEY = ["withdraw-state"];
+
+export function useWithdrawState(enabled = true) {
+  const fn = useServerFn(getWithdrawState);
+  return useQuery({
+    queryKey: WITHDRAW_KEY,
+    queryFn: () => fn({ data: { initData: getInitData() } }),
+    enabled,
+    refetchOnWindowFocus: true,
+    retry: 1,
+  });
+}
+
+export function useCreateWithdrawal() {
+  const qc = useQueryClient();
+  const fn = useServerFn(createWithdrawal);
+  return useMutation({
+    mutationFn: (tokens: number) => fn({ data: { initData: getInitData(), tokens } }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: WITHDRAW_KEY });
+      qc.invalidateQueries({ queryKey: PROFILE_KEY });
+      qc.invalidateQueries({ queryKey: HOME_KEY });
+    },
+  });
 }

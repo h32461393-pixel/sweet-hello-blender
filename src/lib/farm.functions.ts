@@ -23,7 +23,13 @@ function rpcMessage(error: unknown, fallback: string): string {
     "insufficient balance",
     "Daily limit reached",
     "Please wait a moment",
+    "Add a valid BEP-20 wallet address first",
+    "You already have a pending withdrawal",
+    "Amount is too small after fees",
+    "Please reopen the app",
   ];
+  const min = msg.match(/Minimum withdrawal is [\d,.]+ FOX/);
+  if (min) return min[0];
   return known.find((k) => msg.includes(k)) ?? fallback;
 }
 import { MINI_APP_URL, COMMUNITY_URL, PAYMENT_URL, ADMIN_TELEGRAM_ID, BANNER_URL } from "./constants";
@@ -536,3 +542,108 @@ export const getPayoutProof = createServerFn({ method: "GET" }).handler(async ()
     })),
   };
 });
+
+/** Withdrawal settings, merged with admin-editable config. */
+const DEFAULT_WITHDRAW = {
+  firstMin: 10000,
+  nextMin: 20000,
+  feeFlat: 0.01,
+  feePercent: 5,
+  tokensPerUsd: 100000,
+};
+
+async function withdrawConfig(db: Ctx["db"]) {
+  const c = await getConfig(db, "withdraw");
+  const n = (k: string, d: number) => (Number.isFinite(Number(c[k])) ? Number(c[k]) : d);
+  return {
+    firstMin: n("first_min", DEFAULT_WITHDRAW.firstMin),
+    nextMin: n("next_min", DEFAULT_WITHDRAW.nextMin),
+    feeFlat: n("fee_flat", DEFAULT_WITHDRAW.feeFlat),
+    feePercent: n("fee_percent", DEFAULT_WITHDRAW.feePercent),
+    tokensPerUsd: n("tokens_per_usd", DEFAULT_WITHDRAW.tokensPerUsd),
+  };
+}
+
+/** Everything the Withdraw screen needs. */
+export const getWithdrawState = createServerFn({ method: "POST" })
+  .inputValidator(vInit)
+  .handler(async ({ data }) => {
+    const ctx = await loadCtx(data.initData);
+    await rateLimit(ctx.db, "wd_state", ctx.tg.id, 60, 60);
+    const u = await getUserRow(ctx);
+    const cfg = await withdrawConfig(ctx.db);
+
+    const { data: rows } = await ctx.db
+      .from("withdrawals")
+      .select("id, amount_tokens, gross_usd, fee_usd, net_usd, status, txid, created_at, processed_at")
+      .eq("user_id", u.id)
+      .order("created_at", { ascending: false })
+      .limit(30);
+
+    const list = rows ?? [];
+    const done = Number((u as Record<string, unknown>)["withdrawal_count"] ?? 0);
+    return {
+      balance: Number(u.balance ?? 0),
+      walletAddress: (u.wallet_address as string) ?? null,
+      minTokens: done > 0 ? cfg.nextMin : cfg.firstMin,
+      feeFlat: cfg.feeFlat,
+      feePercent: cfg.feePercent,
+      tokensPerUsd: cfg.tokensPerUsd,
+      hasPending: list.some((w) => w.status === "pending"),
+      history: list.map((w) => ({
+        id: w.id as string,
+        tokens: Number(w.amount_tokens ?? 0),
+        gross: Number(w.gross_usd ?? 0),
+        fee: Number(w.fee_usd ?? 0),
+        net: Number(w.net_usd ?? 0),
+        status: w.status as string,
+        txid: (w.txid as string) ?? null,
+        at: w.created_at as string,
+      })),
+    };
+  });
+
+/** Creates a pending withdrawal; all checks happen inside the database. */
+export const createWithdrawal = createServerFn({ method: "POST" })
+  .inputValidator((d: { initData: string; tokens: number }) => {
+    if (typeof d?.initData !== "string" || !d.initData) throw new Error("Invalid session");
+    const tokens = Math.floor(Number(d?.tokens));
+    if (!Number.isFinite(tokens) || tokens <= 0 || tokens > 100_000_000) {
+      throw new Error("Enter a valid amount");
+    }
+    return { initData: d.initData, tokens };
+  })
+  .handler(async ({ data }) => {
+    const ctx = await loadCtx(data.initData);
+    await rateLimit(ctx.db, "wd_create", ctx.tg.id, 5, 3600);
+    const u = await getUserRow(ctx);
+    const cfg = await withdrawConfig(ctx.db);
+
+    const res = await ctx.db.rpc("create_withdrawal_v1", {
+      _user_id: u.id,
+      _tokens: data.tokens,
+      _first_min: cfg.firstMin,
+      _next_min: cfg.nextMin,
+      _fee_flat: cfg.feeFlat,
+      _fee_percent: cfg.feePercent,
+      _tokens_per_usd: cfg.tokensPerUsd,
+    });
+    if (res.error) throw new Error(rpcMessage(res.error, "Could not create the withdrawal"));
+
+    const out = res.data as { id: string; net_usd: number; gross_usd: number; fee_usd: number };
+    try {
+      const { sendMessage } = await import("./telegram.server");
+      await sendMessage(
+        ctx.tg.id,
+        `💸 <b>Withdrawal requested</b>\n\n🪙 ${data.tokens.toLocaleString()} FOX\n💵 You receive: <b>$${Number(out.net_usd).toFixed(4)}</b>\n⏳ Status: pending admin approval\n\nYou will get a message here as soon as it is paid. 🦊`,
+      );
+    } catch {
+      /* notification is best-effort */
+    }
+    return {
+      id: String(out.id),
+      net: Number(out.net_usd),
+      gross: Number(out.gross_usd),
+      fee: Number(out.fee_usd),
+    };
+  });
