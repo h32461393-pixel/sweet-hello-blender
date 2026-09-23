@@ -23,6 +23,14 @@ function rpcMessage(error: unknown, fallback: string): string {
     "insufficient balance",
     "Daily limit reached",
     "Please wait a moment",
+    "Add a valid BEP-20 wallet address first",
+    "You already have a pending withdrawal",
+    "Amount is too small after fees",
+    "Please reopen the app",
+  ];
+  const min = msg.match(/Minimum withdrawal is [\d,.]+ FOX/);
+  if (min) return min[0];
+  const more = [
   ];
   return known.find((k) => msg.includes(k)) ?? fallback;
 }
