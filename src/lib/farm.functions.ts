@@ -647,3 +647,85 @@ export const createWithdrawal = createServerFn({ method: "POST" })
       fee: Number(out.fee_usd),
     };
   });
+
+/* ---------------------------------------------------------------------------
+ * Main / partner tasks (managed from the admin panel)
+ * ------------------------------------------------------------------------ */
+
+const ONE_TIME_DAY = "1970-01-01";
+
+/** Active main and partner tasks, with the user's completion state. */
+export const getTasks = createServerFn({ method: "POST" })
+  .inputValidator(vInit)
+  .handler(async ({ data }) => {
+    const ctx = await loadCtx(data.initData);
+    await rateLimit(ctx.db, "tasks", ctx.tg.id, 60, 60);
+    const u = await getUserRow(ctx);
+
+    const [list, done] = await Promise.all([
+      ctx.db
+        .from("tasks")
+        .select("id, section, title, url, reward, verify_type, icon_url, sort_order")
+        .eq("active", true)
+        .order("sort_order", { ascending: true }),
+      ctx.db.from("task_completions").select("task_key").eq("user_id", u.id),
+    ]);
+
+    const doneKeys = new Set((done.data ?? []).map((r) => r.task_key as string));
+    return {
+      tasks: (list.data ?? []).map((t) => ({
+        id: t.id as string,
+        section: (t.section as string) === "partner" ? "partner" : "main",
+        title: t.title as string,
+        url: t.url as string,
+        reward: Number(t.reward ?? 0),
+        verifyType: (t.verify_type as string) ?? "timer",
+        iconUrl: (t.icon_url as string) ?? null,
+        done: doneKeys.has(`task:${t.id as string}`),
+      })),
+    };
+  });
+
+/** Claims a main/partner task once; channel tasks are verified through the bot. */
+export const claimTask = createServerFn({ method: "POST" })
+  .inputValidator((d: { initData: string; taskId: string }) => {
+    if (typeof d?.initData !== "string" || !d.initData) throw new Error("Invalid session");
+    if (typeof d?.taskId !== "string" || !/^[0-9a-f-]{36}$/i.test(d.taskId)) {
+      throw new Error("Invalid request");
+    }
+    return { initData: d.initData, taskId: d.taskId };
+  })
+  .handler(async ({ data }) => {
+    const ctx = await loadCtx(data.initData);
+    await rateLimit(ctx.db, "task_claim", ctx.tg.id, 40, 3600);
+    const u = await getUserRow(ctx);
+
+    const { data: task } = await ctx.db
+      .from("tasks")
+      .select("id, title, reward, verify_type, chat_username, active")
+      .eq("id", data.taskId)
+      .maybeSingle();
+    if (!task || !task.active) throw new Error("This task is no longer available");
+
+    if (task.verify_type === "channel" && task.chat_username) {
+      const { isChatMember } = await import("./telegram.server");
+      const member = await isChatMember(String(task.chat_username), ctx.tg.id);
+      if (!member) throw new Error("NOT_JOINED");
+    }
+
+    const key = `task:${task.id as string}`;
+    const ins = await ctx.db
+      .from("task_completions")
+      .insert({ task_key: key, user_id: u.id, day: ONE_TIME_DAY });
+    if (ins.error) throw new Error("Already completed");
+
+    const reward = Number(task.reward ?? 0);
+    const { data: balance } = await ctx.db.rpc("credit_user", {
+      _user_id: u.id,
+      _amount: reward,
+      _kind: "task",
+      _note: `Task: ${String(task.title).slice(0, 60)}`,
+      _key: `${key}:${u.id}`,
+    });
+    return { reward, balance: Number(balance ?? 0) };
+  });
