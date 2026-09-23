@@ -493,6 +493,13 @@ export function ProfileTab() {
       <Row icon={Bell} label={t(lang, "notifications")} onClick={() => setScreen("notifications")} trailing={notify ? "On" : "Off"} />
       <Row icon={Globe} label={t(lang, "language")} onClick={() => setScreen("language")} trailing={LANGS.find((l) => l.code === lang)?.label} />
       <Row icon={Info} label={t(lang, "about")} onClick={() => setScreen("about")} />
+
+      {u.isAdmin ? (
+        <>
+          <SectionTitle>Admin</SectionTitle>
+          <Row icon={ShieldCheck} label="Admin panel" onClick={() => { window.location.href = "/admin"; }} />
+        </>
+      ) : null}
     </div>
   );
 }
