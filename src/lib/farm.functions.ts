@@ -437,7 +437,11 @@ export const getProfileState = createServerFn({ method: "POST" })
       _day1_reward: Number(referralCfg["day1"] ?? 400),
       _day2_reward: Number(referralCfg["day2"] ?? 600),
     });
-    if (refreshed.error) throw new Error("Could not refresh referral rewards");
+    // Older self-hosted databases may not have the latest referral RPC yet.
+    // Profile data must remain available while that optional stage refresh is unavailable.
+    if (refreshed.error) {
+      console.error("[profile] referral stage refresh failed", refreshed.error);
+    }
 
     const [tx, refs, referralTx] = await Promise.all([
       ctx.db
@@ -448,14 +452,37 @@ export const getProfileState = createServerFn({ method: "POST" })
         .limit(30),
       ctx.db
         .from("referrals")
-        .select("id, status, pending_reward, stage_join, stage_day1, stage_day2, fake, created_at, app_users!referrals_referee_id_fkey(username, first_name)")
+        .select("id, referee_id, status, pending_reward, stage_join, stage_day1, stage_day2, fake, created_at")
         .eq("referrer_id", u.id)
         .order("created_at", { ascending: false })
         .limit(50),
       ctx.db.from("transactions").select("amount").eq("user_id", u.id).eq("kind", "referral"),
     ]);
 
+    if (tx.error || refs.error || referralTx.error) {
+      console.error("[profile] data query failed", {
+        transactions: tx.error,
+        referrals: refs.error,
+        referralTransactions: referralTx.error,
+      });
+      throw new Error("Could not load profile data");
+    }
+
     const refList = refs.data ?? [];
+    const refereeIds = refList.map((r) => r.referee_id as string);
+    const refereeRows = refereeIds.length
+      ? await ctx.db.from("app_users").select("id, username, first_name").in("id", refereeIds)
+      : { data: [], error: null };
+    if (refereeRows.error) {
+      console.error("[profile] referral names query failed", refereeRows.error);
+    }
+    const refereeById = new Map(
+      (refereeRows.data ?? []).map((row) => [
+        row.id as string,
+        { username: row.username as string | null, firstName: row.first_name as string | null },
+      ]),
+    );
+
     return {
       user: publicUser(u),
       transactions: (tx.data ?? []).map((r) => ({
@@ -471,10 +498,10 @@ export const getProfileState = createServerFn({ method: "POST" })
         pendingTotal: refList.reduce((n, r) => n + (r.status === "pending" ? Number(r.pending_reward ?? 0) : 0), 0),
         earnedTotal: (referralTx.data ?? []).reduce((n, r) => n + Number(r.amount ?? 0), 0),
         list: refList.map((r) => {
-          const ru = (r as { app_users?: { username?: string | null; first_name?: string | null } }).app_users;
+          const ru = refereeById.get(r.referee_id as string);
           return {
             id: r.id as string,
-            name: ru?.username ? `@${ru.username}` : (ru?.first_name ?? "Fox farmer"),
+            name: ru?.username ? `@${ru.username}` : (ru?.firstName ?? "Fox farmer"),
             status: r.status as string,
             pending: Number(r.pending_reward ?? 0),
             stages: { join: !!r.stage_join, day1: !!r.stage_day1, day2: !!r.stage_day2 },

@@ -22,7 +22,7 @@ export const Route = createFileRoute("/api/public/telegram/webhook")({
           return new Response("Unauthorized", { status: 401 });
         }
 
-        const { sendPhoto } = await import("@/lib/telegram.server");
+        const { sendPhoto, sendMessage } = await import("@/lib/telegram.server");
         let update: Update;
         try {
           update = (await request.json()) as Update;
@@ -32,16 +32,23 @@ export const Route = createFileRoute("/api/public/telegram/webhook")({
 
         const msg = update.message;
         if (msg?.text?.startsWith("/start")) {
-          await sendPhoto(
+          const caption = `🦊 <b>Fox Farm</b> 🌾\n\nWelcome${msg.from?.first_name ? ", " + msg.from.first_name : ""}!\n\n⛏️ Mine FOX tokens every hour\n✅ Complete daily and partner tasks\n👥 Invite friends and earn up to 1,200 FOX each\n🎁 Daily streak rewards up to 150 FOX\n💸 Withdraw in USDT (BEP-20)\n\nTap below to start farming!`;
+          const buttons = [
+            [{ text: "🦊 Open Mini App", url: MINI_APP_URL }],
+            [{ text: "📢 Community", url: COMMUNITY_URL }],
+            [{ text: "💸 Payment Channel", url: PAYMENT_URL }],
+          ];
+          const sent = await sendPhoto(
             msg.chat.id,
             BANNER_URL,
-            `🦊 <b>Fox Farm</b> 🌾\n\nWelcome${msg.from?.first_name ? ", " + msg.from.first_name : ""}!\n\n⛏️ Mine FOX tokens every hour\n✅ Complete daily and partner tasks\n👥 Invite friends and earn up to 1,200 FOX each\n🎁 Daily streak rewards up to 150 FOX\n💸 Withdraw in USDT (BEP-20)\n\nTap below to start farming!`,
-            [
-              [{ text: "🦊 Open Mini App", url: MINI_APP_URL }],
-              [{ text: "📢 Community", url: COMMUNITY_URL }],
-              [{ text: "💸 Payment Channel", url: PAYMENT_URL }],
-            ],
+            caption,
+            buttons,
           );
+          // A remote banner can become unavailable. Never let that prevent /start.
+          if (!sent) {
+            const fallback = await sendMessage(msg.chat.id, caption, buttons);
+            if (!fallback) return new Response("Telegram delivery failed", { status: 502 });
+          }
         }
 
         return new Response("ok");

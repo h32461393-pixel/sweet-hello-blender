@@ -20,3 +20,9 @@
 - [x] Build real referral data, personal invite links, history and secure reward claims
 - [x] Refresh the app palette and navigation surface
 - Rotate the bot token and keys that were pasted in chat
+
+## Reliability fixes (done)
+- [x] Keep Profile and Refer available when referral-stage refresh is unavailable
+- [x] Remove the fragile embedded referral-name relationship query
+- [x] Fall back to a text welcome when the Telegram banner cannot be delivered
+- [x] Log safe Telegram API errors for webhook diagnosis
