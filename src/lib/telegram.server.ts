@@ -51,14 +51,32 @@ const API = () => `https://api.telegram.org/bot${process.env["TELEGRAM_BOT_TOKEN
 
 export async function tgCall<T = unknown>(method: string, body: Record<string, unknown>): Promise<T | null> {
   try {
+    if (!process.env["TELEGRAM_BOT_TOKEN"]) {
+      console.error(`[telegram] ${method} failed: TELEGRAM_BOT_TOKEN is not configured`);
+      return null;
+    }
     const res = await fetch(`${API()}/${method}`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
     });
-    const json = (await res.json()) as { ok: boolean; result?: T };
-    return json.ok ? (json.result ?? null) : null;
-  } catch {
+    const json = (await res.json()) as {
+      ok: boolean;
+      result?: T;
+      error_code?: number;
+      description?: string;
+    };
+    if (!res.ok || !json.ok) {
+      console.error(`[telegram] ${method} failed`, {
+        status: res.status,
+        errorCode: json.error_code,
+        description: json.description,
+      });
+      return null;
+    }
+    return json.result ?? null;
+  } catch (error) {
+    console.error(`[telegram] ${method} request failed`, error);
     return null;
   }
 }
