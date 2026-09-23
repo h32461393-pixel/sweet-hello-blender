@@ -14,6 +14,8 @@ import {
   setWallet,
   getWithdrawState,
   createWithdrawal,
+  getTasks,
+  claimTask,
 } from "@/lib/farm.functions";
 import { getInitData } from "@/lib/telegram-client";
 
@@ -142,6 +144,31 @@ export function useCreateWithdrawal() {
     onSettled: () => {
       qc.invalidateQueries({ queryKey: WITHDRAW_KEY });
       qc.invalidateQueries({ queryKey: PROFILE_KEY });
+      qc.invalidateQueries({ queryKey: HOME_KEY });
+    },
+  });
+}
+
+export const TASKS_KEY = ["tasks-state"];
+
+export function useTasks(enabled = true) {
+  const fn = useServerFn(getTasks);
+  return useQuery({
+    queryKey: TASKS_KEY,
+    queryFn: () => fn({ data: { initData: getInitData() } }),
+    enabled,
+    refetchOnWindowFocus: true,
+    retry: 1,
+  });
+}
+
+export function useClaimTask() {
+  const qc = useQueryClient();
+  const fn = useServerFn(claimTask);
+  return useMutation({
+    mutationFn: (taskId: string) => fn({ data: { initData: getInitData(), taskId } }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: TASKS_KEY });
       qc.invalidateQueries({ queryKey: HOME_KEY });
     },
   });
