@@ -81,7 +81,6 @@ curl -sS "https://api.telegram.org/bot${BOT_TOKEN}/setWebhook" \
   --data-urlencode "url=${APP_URL}/api/public/telegram/webhook" \
   --data-urlencode "secret_token=${WEBHOOK_SECRET}"
 
-unset BOT_TOKEN WEBHOOK_SECRET APP_URL
 ```
 
 Telegram webhook response එකේ `"ok":true` පෙන්විය යුතුය.
