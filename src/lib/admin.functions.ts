@@ -1,3 +1,4 @@
+import { dbHint } from "./db-errors";
 import { createServerFn } from "@tanstack/react-start";
 import { rateLimit, assertAdmin } from "./security.server";
 import { MINI_APP_URL, PAYMENT_URL } from "./constants";
@@ -366,7 +367,9 @@ export const adminSaveTask = createServerFn({ method: "POST" })
     const res = data.id
       ? await ctx.db.from("tasks").update(row).eq("id", data.id)
       : await ctx.db.from("tasks").insert(row);
-    if (res.error) throw new Error("Could not save the task");
+    if (res.error) {
+      throw new Error(dbHint(res.error) ?? "Could not save the task");
+    }
     await audit(ctx, data.id ? "task_update" : "task_create", data.id ?? data.title, row);
     return { ok: true };
   });

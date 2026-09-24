@@ -28,3 +28,15 @@
 - [x] Log safe Telegram API errors for webhook diagnosis
 - [x] Document every required self-hosted database update in execution order
 - [x] Verify referral, ads and withdrawal database functions exist on the connected backend
+
+## Sept 24 request
+- [x] Clear save errors (missing database updates / wrong server key are now named)
+- [x] One wallet address = one account (also past withdrawal addresses)
+- [x] Same device => auto-suspend; same device/network referrals => fake, no reward
+- [x] Auto-suspend when balance does not match the ledger
+- [x] Suspended screen with reason only
+- [x] Payout proof link points to the Vercel site
+- [ ] Real ad network logos; remove "Visit sites" ads
+- [ ] Admin: saved reward codes list, per-user full activity view
+- [ ] Bot: daily reminder + mining-ready notification (needs a scheduled job)
+- [ ] /start on Vercel: re-register webhook to the Vercel domain (user step)
