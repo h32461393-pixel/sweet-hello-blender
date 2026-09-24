@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as PayoutsRouteImport } from './routes/payouts'
+import { Route as ApiPublicCronRemindersRouteImport } from './routes/api/public/cron/reminders'
 import { Route as ApiPublicTelegramWebhookRouteImport } from './routes/api/public/telegram/webhook'
 
 const IndexRoute = IndexRouteImport.update({
@@ -29,6 +30,11 @@ const PayoutsRoute = PayoutsRouteImport.update({
   path: '/payouts',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicCronRemindersRoute = ApiPublicCronRemindersRouteImport.update({
+  id: '/api/public/cron/reminders',
+  path: '/api/public/cron/reminders',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicTelegramWebhookRoute =
   ApiPublicTelegramWebhookRouteImport.update({
     id: '/api/public/telegram/webhook',
@@ -40,12 +46,14 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/payouts': typeof PayoutsRoute
+  '/api/public/cron/reminders': typeof ApiPublicCronRemindersRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/payouts': typeof PayoutsRoute
+  '/api/public/cron/reminders': typeof ApiPublicCronRemindersRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
 }
 export interface FileRoutesById {
@@ -53,20 +61,38 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/payouts': typeof PayoutsRoute
+  '/api/public/cron/reminders': typeof ApiPublicCronRemindersRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/admin' | '/payouts' | '/api/public/telegram/webhook'
+  fullPaths:
+    | '/'
+    | '/admin'
+    | '/payouts'
+    | '/api/public/cron/reminders'
+    | '/api/public/telegram/webhook'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/admin' | '/payouts' | '/api/public/telegram/webhook'
-  id: '__root__' | '/' | '/admin' | '/payouts' | '/api/public/telegram/webhook'
+  to:
+    | '/'
+    | '/admin'
+    | '/payouts'
+    | '/api/public/cron/reminders'
+    | '/api/public/telegram/webhook'
+  id:
+    | '__root__'
+    | '/'
+    | '/admin'
+    | '/payouts'
+    | '/api/public/cron/reminders'
+    | '/api/public/telegram/webhook'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
   PayoutsRoute: typeof PayoutsRoute
+  ApiPublicCronRemindersRoute: typeof ApiPublicCronRemindersRoute
   ApiPublicTelegramWebhookRoute: typeof ApiPublicTelegramWebhookRoute
 }
 
@@ -93,6 +119,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PayoutsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/cron/reminders': {
+      id: '/api/public/cron/reminders'
+      path: '/api/public/cron/reminders'
+      fullPath: '/api/public/cron/reminders'
+      preLoaderRoute: typeof ApiPublicCronRemindersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/telegram/webhook': {
       id: '/api/public/telegram/webhook'
       path: '/api/public/telegram/webhook'
@@ -107,6 +140,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
   PayoutsRoute: PayoutsRoute,
+  ApiPublicCronRemindersRoute: ApiPublicCronRemindersRoute,
   ApiPublicTelegramWebhookRoute: ApiPublicTelegramWebhookRoute,
 }
 export const routeTree = rootRouteImport
