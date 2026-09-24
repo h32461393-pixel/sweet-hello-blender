@@ -132,7 +132,7 @@ export const syncUser = createServerFn({ method: "POST" })
           }
         }
       }
-      await db.from("app_users").update(patch).eq("id", ex.id);
+      await db.from("app_users").update(patch as never).eq("id", ex.id);
       const fresh = await db.from("app_users").select("*").eq("id", existing.data.id).maybeSingle();
       return { user: publicUser(fresh.data ?? existing.data) };
     }
