@@ -9,11 +9,20 @@
 ## 2. Free backend project එක සකස් කිරීම
 
 1. ඔබට අයිති, Postgres සහ `SUPABASE_*` keys ලබාදෙන free backend project එකක් සාදන්න.
-2. එහි SQL editor එක තුළ `drizzle/migrations/0000_fox_farm_core.sql` file එකේ සම්පූර්ණ SQL එක run කරන්න.
+2. එහි SQL editor එක තුළ පහත files **මේ පිළිවෙළට**, එකින් එක සම්පූර්ණයෙන් run කරන්න. එකක්වත් මඟ හරින්න එපා:
+
+   1. `drizzle/migrations/0000_fox_farm_core.sql`
+   2. `drizzle/migrations/0001_security_hardening.sql`
+   3. `drizzle/migrations/0002_ads_and_payout_proof.sql`
+   4. `drizzle/migrations/0003_ads_networks_and_withdrawals.sql`
+   5. `drizzle/migrations/0004_secure_referral_reward_claims.sql`
+   6. `drizzle/migrations/0005_fix_referral_claim_row_lock.sql`
+
+   `0004` සහ `0005` නොමැති නම් Refer සහ Profile load නොවේ. `0001`–`0003` නොමැති නම් rewards, ads සහ withdrawals අසාර්ථක වේ.
 3. Project URL, public publishable key සහ private server/service-role key එක copy කර ආරක්ෂිතව තබන්න.
 4. Private server key එක browser variable එකකට හෝ `VITE_` prefix එකක් සහිත variable එකකට දමන්න එපා.
 
-Migration එක tables, grants, row-level security සහ server-side balance function එක එකවර සකස් කරයි.
+මෙම migrations සියල්ල tables, grants, row-level security, balance protection, rewards, referrals, ads සහ withdrawals සකස් කරයි.
 
 ## 3. GitHub සහ Vercel
 
@@ -72,10 +81,21 @@ curl -sS "https://api.telegram.org/bot${BOT_TOKEN}/setWebhook" \
   --data-urlencode "url=${APP_URL}/api/public/telegram/webhook" \
   --data-urlencode "secret_token=${WEBHOOK_SECRET}"
 
-unset BOT_TOKEN WEBHOOK_SECRET APP_URL
 ```
 
 Telegram webhook response එකේ `"ok":true` පෙන්විය යුතුය.
+
+Webhook එක නිවැරදි URL එකට සම්බන්ධ වීදැයි පරීක්ෂා කිරීමට, එම terminal session එකේම මෙය run කරන්න:
+
+```sh
+curl -sS "https://api.telegram.org/bot${BOT_TOKEN}/getWebhookInfo"
+```
+
+එහි `url` value එක `https://YOUR-APP.vercel.app/api/public/telegram/webhook` විය යුතු අතර `last_error_message` හි අලුත් error එකක් නොතිබිය යුතුය. පරීක්ෂාවෙන් පසු secrets ඉවත් කරන්න:
+
+```sh
+unset BOT_TOKEN WEBHOOK_SECRET APP_URL
+```
 
 ## 6. පරීක්ෂා කිරීම
 
