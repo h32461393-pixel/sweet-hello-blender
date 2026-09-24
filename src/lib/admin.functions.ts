@@ -160,16 +160,17 @@ export const adminAdjustBalance = createServerFn({ method: "POST" })
   });
 
 export const adminSetSuspended = createServerFn({ method: "POST" })
-  .inputValidator((d: Auth & { userId: string; suspended: boolean }) => {
+  .inputValidator((d: Auth & { userId: string; suspended: boolean; reason?: string }) => {
     vAuth(d);
     if (!/^[0-9a-f-]{36}$/i.test(String(d.userId))) throw new Error("Invalid request");
-    return { ...d, suspended: Boolean(d.suspended) };
+    const reason = String(d.reason ?? "").trim().slice(0, 200) || "Violation of Fox Farm rules.";
+    return { ...d, suspended: Boolean(d.suspended), reason };
   })
   .handler(async ({ data }) => {
     const ctx = await adminCtx(data);
     const { error } = await ctx.db
       .from("app_users")
-      .update({ suspended: data.suspended })
+      .update({ suspended: data.suspended, suspend_reason: data.suspended ? data.reason : null })
       .eq("id", data.userId);
     if (error) throw new Error("Could not update the account");
     await audit(ctx, data.suspended ? "suspend" : "unsuspend", data.userId, {});
