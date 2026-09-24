@@ -84,7 +84,13 @@ function Index() {
 /** Stable per-device id (hash of device traits + a stored random seed). */
 async function deviceId(): Promise<string> {
   try {
+    let seed = localStorage.getItem("foxfarm.dev");
+    if (!seed) {
+      seed = crypto.randomUUID();
+      localStorage.setItem("foxfarm.dev", seed);
+    }
     const traits = [
+      seed,
       navigator.userAgent,
       navigator.language,
       screen.width + "x" + screen.height + "x" + screen.colorDepth,
