@@ -450,3 +450,78 @@ export const adminBroadcast = createServerFn({ method: "POST" })
     await audit(ctx, "broadcast", null, { sent });
     return { sent };
   });
+
+export const adminListCodes = createServerFn({ method: "POST" })
+  .inputValidator(vAuth)
+  .handler(async ({ data }) => {
+    const ctx = await adminCtx(data);
+    const { data: rows, error } = await ctx.db
+      .from("reward_codes")
+      .select("code, amount, max_uses, uses, active, expires_at, created_at")
+      .order("created_at", { ascending: false })
+      .limit(200);
+    if (error) throw new Error(dbHint(error) ?? "Could not load codes");
+    return {
+      codes: (rows ?? []).map((r) => ({
+        code: String(r.code),
+        amount: Number(r.amount),
+        maxUses: Number(r.max_uses),
+        uses: Number(r.uses),
+        active: Boolean(r.active),
+      })),
+    };
+  });
+
+export const adminSetCodeActive = createServerFn({ method: "POST" })
+  .inputValidator((d: Auth & { code: string; active: boolean }) => {
+    vAuth(d);
+    const code = String(d.code ?? "").toUpperCase();
+    if (!/^[A-Z0-9_-]{3,40}$/.test(code)) throw new Error("Invalid code");
+    return { ...d, code, active: Boolean(d.active) };
+  })
+  .handler(async ({ data }) => {
+    const ctx = await adminCtx(data);
+    const { error } = await ctx.db.from("reward_codes").update({ active: data.active }).eq("code", data.code);
+    if (error) throw new Error(dbHint(error) ?? "Could not update code");
+    await audit(ctx, data.active ? "code_enable" : "code_disable", data.code, {});
+    return { ok: true };
+  });
+
+/** Full activity for one user: ledger, ads, withdrawals, referrals, tasks. */
+export const adminUserActivity = createServerFn({ method: "POST" })
+  .inputValidator((d: Auth & { userId: string }) => {
+    vAuth(d);
+    if (!/^[0-9a-f-]{36}$/i.test(String(d.userId ?? ""))) throw new Error("Invalid user");
+    return d;
+  })
+  .handler(async ({ data }) => {
+    const ctx = await adminCtx(data);
+    const db = ctx.db;
+    const [u, tx, ads, wd, refs, tasks] = await Promise.all([
+      db.from("app_users").select("signup_ip, device_hash, suspend_reason, created_at, last_seen_at, streak_day, withdrawal_count").eq("id", data.userId).maybeSingle(),
+      db.from("transactions").select("kind, amount, note, created_at").eq("user_id", data.userId).order("created_at", { ascending: false }).limit(100),
+      db.from("ad_views").select("source, reward, created_at").eq("user_id", data.userId).order("created_at", { ascending: false }).limit(50),
+      db.from("withdrawals").select("amount_tokens, net_usd, status, address, txid, created_at").eq("user_id", data.userId).order("created_at", { ascending: false }).limit(30),
+      db.from("referrals").select("status, fake, pending_reward, created_at").eq("referrer_id", data.userId).order("created_at", { ascending: false }).limit(100),
+      db.from("task_completions").select("task_key, day, created_at").eq("user_id", data.userId).order("created_at", { ascending: false }).limit(50),
+    ]);
+    const ledger = (tx.data ?? []).reduce((a, r) => a + Number(r.amount), 0);
+    return {
+      info: u.data
+        ? {
+            ip: (u.data.signup_ip as string) ?? null,
+            device: (u.data.device_hash as string) ?? null,
+            reason: (u.data.suspend_reason as string) ?? null,
+            joined: String(u.data.created_at),
+            lastSeen: String(u.data.last_seen_at),
+            withdrawals: Number(u.data.withdrawal_count),
+          }
+        : null,
+      ledgerRecent: ledger,
+      transactions: (tx.data ?? []).map((r) => ({ kind: String(r.kind), amount: Number(r.amount), note: (r.note as string) ?? "", at: String(r.created_at) })),
+      ads: (ads.data ?? []).map((r) => ({ source: String(r.source), reward: Number(r.reward), at: String(r.created_at) })),
+      withdrawals: (wd.data ?? []).map((r) => ({ tokens: Number(r.amount_tokens), net: Number(r.net_usd), status: String(r.status), txid: (r.txid as string) ?? null, at: String(r.created_at) })),
+      referrals: (refs.data ?? []).map((r) => ({ status: String(r.status), fake: Boolean(r.fake), pending: Number(r.pending_reward), at: String(r.created_at) })),
+      tasks: (tasks.data ?? []).map((r) => ({ key: String(r.task_key), at: String(r.created_at) })),
+    };
+  });
