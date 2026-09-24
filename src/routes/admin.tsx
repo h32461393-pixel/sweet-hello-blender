@@ -18,6 +18,9 @@ import {
   adminSaveTask,
   adminDeleteTask,
   adminCreateCode,
+  adminListCodes,
+  adminSetCodeActive,
+  adminUserActivity,
   adminAudit,
   adminBroadcast,
 } from "@/lib/admin.functions";
@@ -184,6 +187,7 @@ function Overview({ creds }: { creds: Creds }) {
 function Users({ creds }: { creds: Creds }) {
   const [q, setQ] = useState("");
   const [amount, setAmount] = useState<Record<string, string>>({});
+  const [open, setOpen] = useState<string | null>(null);
   const search = useServerFn(adminSearchUsers);
   const adjustFn = useServerFn(adminAdjustBalance);
   const suspendFn = useServerFn(adminSetSuspended);
@@ -201,7 +205,10 @@ function Users({ creds }: { creds: Creds }) {
     onError: (e) => toast.error((e as Error).message),
   });
   const suspend = useMutation({
-    mutationFn: (v: { userId: string; suspended: boolean }) => suspendFn({ data: { ...creds, ...v } }),
+    mutationFn: (v: { userId: string; suspended: boolean }) => {
+      const reason = v.suspended ? (window.prompt("Suspend reason (shown to the user)", "Violation of Fox Farm rules.") ?? "") : "";
+      return suspendFn({ data: { ...creds, ...v, reason } });
+    },
     onSuccess: () => { toast.success("Account updated"); refresh(); },
     onError: (e) => toast.error((e as Error).message),
   });
@@ -219,6 +226,9 @@ function Users({ creds }: { creds: Creds }) {
               <p className="text-xs text-muted-foreground">🆔 {u.telegramId}</p>
               <p className="text-xs">🪙 {u.balance.toLocaleString()} FOX · earned {u.totalEarned.toLocaleString()}</p>
               {u.wallet ? <p className="truncate text-[10px] text-muted-foreground">{u.wallet}</p> : null}
+              <button onClick={() => setOpen(open === u.id ? null : u.id)} className="mt-1 text-xs font-bold text-primary">
+                {open === u.id ? "Hide activity ▲" : "View all activity ▼"}
+              </button>
             </div>
             <button
               onClick={() => suspend.mutate({ userId: u.id, suspended: !u.suspended })}
@@ -243,6 +253,7 @@ function Users({ creds }: { creds: Creds }) {
               Apply
             </button>
           </div>
+          {open === u.id && <Activity creds={creds} userId={u.id} />}
         </Card>
       ))}
     </div>
@@ -494,9 +505,18 @@ function Codes({ creds }: { creds: Creds }) {
   const [reward, setReward] = useState("500");
   const [uses, setUses] = useState("100");
   const fn = useServerFn(adminCreateCode);
+  const listFn = useServerFn(adminListCodes);
+  const toggleFn = useServerFn(adminSetCodeActive);
+  const qc = useQueryClient();
+  const { data: list } = useQuery({ queryKey: ["admin-codes"], queryFn: () => listFn({ data: creds }) });
+  const toggle = useMutation({
+    mutationFn: (v: { code: string; active: boolean }) => toggleFn({ data: { ...creds, ...v } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-codes"] }),
+    onError: (e) => toast.error((e as Error).message),
+  });
   const create = useMutation({
     mutationFn: () => fn({ data: { ...creds, code, reward: Number(reward), maxUses: Number(uses) } }),
-    onSuccess: () => { toast.success("Code created"); setCode(""); },
+    onSuccess: () => { toast.success("Code created"); setCode(""); qc.invalidateQueries({ queryKey: ["admin-codes"] }); },
     onError: (e) => toast.error((e as Error).message),
   });
   return (
@@ -512,7 +532,54 @@ function Codes({ creds }: { creds: Creds }) {
           Create reward code
         </button>
       </div>
+      <div className="mt-4 space-y-2">
+        <p className="text-sm font-black">Saved codes ({list?.codes.length ?? 0})</p>
+        {(list?.codes ?? []).map((c) => (
+          <div key={c.code} className="flex items-center justify-between rounded-xl border border-border p-2">
+            <div>
+              <p className="font-mono text-sm font-bold">{c.code}</p>
+              <p className="text-[11px] text-muted-foreground">🪙 {c.amount} · used {c.uses}/{c.maxUses}</p>
+            </div>
+            <button
+              onClick={() => toggle.mutate({ code: c.code, active: !c.active })}
+              className={`rounded-lg px-2 py-1 text-xs font-bold ${c.active ? "bg-secondary" : "bg-muted text-muted-foreground"}`}
+            >
+              {c.active ? "Active" : "Disabled"}
+            </button>
+          </div>
+        ))}
+      </div>
     </Card>
+  );
+}
+
+function Activity({ creds, userId }: { creds: Creds; userId: string }) {
+  const fn = useServerFn(adminUserActivity);
+  const { data, isLoading } = useQuery({ queryKey: ["admin-act", userId], queryFn: () => fn({ data: { ...creds, userId } }) });
+  if (isLoading || !data) return <p className="mt-2 text-xs text-muted-foreground">Loading…</p>;
+  const t = (s: string) => new Date(s).toLocaleString();
+  const Sec = ({ title, rows }: { title: string; rows: string[] }) => (
+    <div className="mt-2">
+      <p className="text-xs font-black">{title} ({rows.length})</p>
+      <div className="max-h-40 space-y-0.5 overflow-y-auto">
+        {rows.map((r, i) => <p key={i} className="break-all text-[10px] text-muted-foreground">{r}</p>)}
+      </div>
+    </div>
+  );
+  return (
+    <div className="mt-2 rounded-xl bg-muted p-2">
+      {data.info && (
+        <p className="break-all text-[10px]">
+          🌐 IP {data.info.ip ?? "-"} · 📱 {data.info.device?.slice(0, 12) ?? "-"} · joined {t(data.info.joined)} · seen {t(data.info.lastSeen)}
+          {data.info.reason ? ` · 🚫 ${data.info.reason}` : ""}
+        </p>
+      )}
+      <Sec title="💰 Transactions" rows={data.transactions.map((r) => `${t(r.at)} · ${r.kind} · ${r.amount > 0 ? "+" : ""}${r.amount} · ${r.note}`)} />
+      <Sec title="🎬 Ads" rows={data.ads.map((r) => `${t(r.at)} · ${r.source} · +${r.reward}`)} />
+      <Sec title="✅ Tasks" rows={data.tasks.map((r) => `${t(r.at)} · ${r.key}`)} />
+      <Sec title="👥 Referrals" rows={data.referrals.map((r) => `${t(r.at)} · ${r.fake ? "❌ FAKE" : r.status} · pending ${r.pending}`)} />
+      <Sec title="💸 Withdrawals" rows={data.withdrawals.map((r) => `${t(r.at)} · ${r.tokens} FOX · $${r.net} · ${r.status}${r.txid ? " · " + r.txid : ""}`)} />
+    </div>
   );
 }
 

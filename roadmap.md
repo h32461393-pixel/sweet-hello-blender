@@ -36,7 +36,7 @@
 - [x] Auto-suspend when balance does not match the ledger
 - [x] Suspended screen with reason only
 - [x] Payout proof link points to the Vercel site
-- [ ] Real ad network logos; remove "Visit sites" ads
-- [ ] Admin: saved reward codes list, per-user full activity view
-- [ ] Bot: daily reminder + mining-ready notification (needs a scheduled job)
+- [x] Real ad network logos; remove "Visit sites" ads
+- [x] Admin: saved reward codes list, per-user full activity view, suspend reason
+- [x] Bot: daily reminder + mining-ready notification (user sets up cron-job.org)
 - [ ] /start on Vercel: re-register webhook to the Vercel domain (user step)
