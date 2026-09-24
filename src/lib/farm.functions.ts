@@ -1,5 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
-import { rateLimit } from "./security.server";
+import { rateLimit, clientIp } from "./security.server";
+import { dbHint } from "./db-errors";
+import { getRequest } from "@tanstack/react-start/server";
 
 /** Strict validator: only a session string is accepted from the client. */
 function vInit(d: { initData: string }) {
@@ -27,6 +29,7 @@ function rpcMessage(error: unknown, fallback: string): string {
     "You already have a pending withdrawal",
     "Amount is too small after fees",
     "Please reopen the app",
+    "already used by another account",
   ];
   const min = msg.match(/Minimum withdrawal is [\d,.]+ FOX/);
   if (min) return min[0];
@@ -35,19 +38,7 @@ function rpcMessage(error: unknown, fallback: string): string {
   return dbHint(error) ?? fallback;
 }
 
-/** Maps setup problems (missing database updates, bad keys) to a clear hint. */
-export function dbHint(error: unknown): string | null {
-  const e = error as { message?: string; code?: string } | null;
-  const msg = e?.message ?? "";
-  if (e) console.error("[db]", e.code, msg);
-  if (e?.code === "42883" || e?.code === "PGRST202" || /function .* does not exist|Could not find the function/i.test(msg))
-    return "Database update missing — run all SQL updates from the guide (0000–0006).";
-  if (e?.code === "42703" || e?.code === "PGRST204" || /column .* does not exist|Could not find the '.*' column/i.test(msg))
-    return "Database update missing — run all SQL updates from the guide (0000–0006).";
-  if (e?.code === "42501" || /permission denied/i.test(msg))
-    return "Server key is wrong — use the private service_role key on the server.";
-  return null;
-}
+
 import { MINI_APP_URL, COMMUNITY_URL, PAYMENT_URL, ADMIN_TELEGRAM_ID, BANNER_URL } from "./constants";
 
 type Ctx = Awaited<ReturnType<typeof loadCtx>>;
@@ -95,7 +86,11 @@ function publicUser(u: Record<string, unknown>) {
 
 /** Verifies Telegram identity, creates the account on first open, applies referral. */
 export const syncUser = createServerFn({ method: "POST" })
-  .inputValidator(vInit)
+  .inputValidator((d: { initData: string; device?: string }) => {
+    const base = vInit(d);
+    const device = typeof d?.device === "string" && /^[a-f0-9]{16,64}$/.test(d.device) ? d.device : null;
+    return { ...base, device };
+  })
   .handler(async ({ data }) => {
     const ctx = await loadCtx(data.initData);
     await rateLimit(ctx.db, "sync", ctx.tg.id, 30, 60);
@@ -103,18 +98,41 @@ export const syncUser = createServerFn({ method: "POST" })
     const db = ctx.db;
 
 
+    let ip: string | null = null;
+    try { ip = clientIp(getRequest().headers); } catch { ip = null; }
+    if (ip === "unknown") ip = null;
     const existing = await db.from("app_users").select("*").eq("telegram_id", ctx.tg.id).maybeSingle();
 
     if (existing.data) {
-      await db
-        .from("app_users")
-        .update({
-          username: ctx.tg.username ?? null,
-          first_name: ctx.tg.first_name ?? null,
-          photo_url: ctx.tg.photo_url ?? null,
-          last_seen_at: new Date().toISOString(),
-        })
-        .eq("id", existing.data.id);
+      const ex = existing.data;
+      const patch: Record<string, unknown> = {
+        username: ctx.tg.username ?? null,
+        first_name: ctx.tg.first_name ?? null,
+        photo_url: ctx.tg.photo_url ?? null,
+        last_seen_at: new Date().toISOString(),
+      };
+      if (!ex.device_hash && data.device) patch["device_hash"] = data.device;
+      if (!ex.signup_ip && ip) patch["signup_ip"] = ip;
+      // Auto-suspend: balance must always equal the ledger sum.
+      if (!ex.suspended) {
+        const led = await db.from("transactions").select("amount").eq("user_id", ex.id).limit(100000);
+        if (!led.error) {
+          const sum = (led.data ?? []).reduce((a, r) => a + Number(r.amount), 0);
+          if (sum !== Number(ex.balance)) {
+            patch["suspended"] = true;
+            patch["suspend_reason"] = "Balance does not match your activity history.";
+            await sendMessage(ADMIN_TELEGRAM_ID, `🚨 <b>Auto-suspended</b>\n🆔 <code>${ctx.tg.id}</code>\n⚖️ Balance ${ex.balance} ≠ ledger ${sum}`);
+          }
+        }
+        if (data.device && !patch["suspended"]) {
+          const twin = await db.from("app_users").select("id").eq("device_hash", data.device).neq("id", ex.id).limit(1);
+          if ((twin.data?.length ?? 0) > 0 && ex.device_hash !== data.device) {
+            patch["suspended"] = true;
+            patch["suspend_reason"] = "Multiple accounts on the same device are not allowed.";
+          }
+        }
+      }
+      await db.from("app_users").update(patch).eq("id", ex.id);
       const fresh = await db.from("app_users").select("*").eq("id", existing.data.id).maybeSingle();
       return { user: publicUser(fresh.data ?? existing.data) };
     }
@@ -128,6 +146,8 @@ export const syncUser = createServerFn({ method: "POST" })
         last_name: ctx.tg.last_name ?? null,
         photo_url: ctx.tg.photo_url ?? null,
         language_code: ctx.tg.language_code ?? null,
+        signup_ip: ip,
+        device_hash: data.device,
       })
       .select("*")
       .single();
@@ -135,24 +155,49 @@ export const syncUser = createServerFn({ method: "POST" })
     if (inserted.error || !inserted.data) throw new Error("Could not create your account");
     const me = inserted.data;
 
+    // Anti-cheat: another account on this device => suspended; shared IP => fake referral.
+    let sameDevice = false;
+    let sameIpCount = 0;
+    if (data.device) {
+      const t = await db.from("app_users").select("id").eq("device_hash", data.device).neq("id", me.id).limit(1);
+      sameDevice = (t.data?.length ?? 0) > 0;
+    }
+    if (ip) {
+      const t = await db.from("app_users").select("id", { count: "exact", head: true }).eq("signup_ip", ip).neq("id", me.id);
+      sameIpCount = t.count ?? 0;
+    }
+    if (sameDevice) {
+      await db.from("app_users").update({ suspended: true, suspend_reason: "Multiple accounts on the same device are not allowed." }).eq("id", me.id);
+      me.suspended = true;
+      me.suspend_reason = "Multiple accounts on the same device are not allowed.";
+    }
+
     // Referral (start_param = ref<telegram id>)
     const ref = ctx.startParam?.match(/^ref(\d+)$/);
     if (ref) {
       const refId = Number(ref[1]);
       if (refId !== ctx.tg.id) {
-        const referrer = await db.from("app_users").select("id, telegram_id, suspended").eq("telegram_id", refId).maybeSingle();
+        const referrer = await db.from("app_users").select("id, telegram_id, suspended, signup_ip, device_hash").eq("telegram_id", refId).maybeSingle();
         if (referrer.data && !referrer.data.suspended) {
           const cfg = await getConfig(db, "referral");
           const joinReward = Number(cfg["join"] ?? 200);
+          const fake =
+            sameDevice ||
+            sameIpCount >= 2 ||
+            (!!ip && referrer.data.signup_ip === ip) ||
+            (!!data.device && referrer.data.device_hash === data.device);
           await db.from("app_users").update({ referred_by: referrer.data.id }).eq("id", me.id);
           await db.from("referrals").insert({
             referrer_id: referrer.data.id,
             referee_id: me.id,
-            status: "pending",
-            pending_reward: joinReward,
-            stage_join: true,
+            status: fake ? "fake" : "pending",
+            pending_reward: fake ? 0 : joinReward,
+            stage_join: !fake,
+            fake,
           });
-          await sendMessage(
+          if (fake) {
+            await sendMessage(referrer.data.telegram_id, `⚠️ <b>Referral marked as fake</b>\n👤 ${ctx.tg.first_name ?? "A user"} joined from the same device/network. No reward is given.`);
+          } else await sendMessage(
             referrer.data.telegram_id,
             `🎉 <b>New referral!</b>\n👤 ${ctx.tg.first_name ?? "A friend"} joined using your link.\n🪙 ${joinReward} FOX is waiting in your Refer tab.`,
             [[{ text: "🦊 Open Mini App", url: MINI_APP_URL }]],
