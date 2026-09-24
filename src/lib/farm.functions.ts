@@ -83,6 +83,7 @@ function publicUser(u: Record<string, unknown>) {
     balance: Number(u["balance"] ?? 0),
     totalEarned: Number(u["total_earned"] ?? 0),
     suspended: Boolean(u["suspended"]),
+    suspendReason: (u["suspend_reason"] as string) ?? null,
     walletAddress: (u["wallet_address"] as string) ?? null,
     streakDay: Number(u["streak_day"] ?? 0),
     lastDailyDate: (u["last_daily_date"] as string) ?? null,
@@ -563,8 +564,25 @@ export const setWallet = createServerFn({ method: "POST" })
       throw new Error("Enter a valid BEP-20 address starting with 0x");
     }
 
+    const addr = data.address.toLowerCase();
+    if (u.wallet_address && String(u.wallet_address).toLowerCase() === addr) return { ok: true, address: data.address };
+    // One wallet = one account, forever: also blocks addresses used in past withdrawals.
+    const [owner, usedWd] = await Promise.all([
+      ctx.db.from("app_users").select("id").ilike("wallet_address", addr).neq("id", u.id).limit(1),
+      ctx.db.from("withdrawals").select("id").ilike("address", addr).neq("user_id", u.id).limit(1),
+    ]);
+    if ((owner.data?.length ?? 0) > 0 || (usedWd.data?.length ?? 0) > 0) {
+      throw new Error("This wallet address is already used by another account");
+    }
+    if (u.wallet_address && Number(u.withdrawal_count ?? 0) > 0) {
+      const pend = await ctx.db.from("withdrawals").select("id").eq("user_id", u.id).eq("status", "pending").limit(1);
+      if ((pend.data?.length ?? 0) > 0) throw new Error("You cannot change the wallet while a withdrawal is pending");
+    }
     const { error } = await ctx.db.from("app_users").update({ wallet_address: data.address }).eq("id", u.id);
-    if (error) throw new Error("Could not save the address");
+    if (error) {
+      if (error.code === "23505") throw new Error("This wallet address is already used by another account");
+      throw new Error(dbHint(error) ?? "Could not save the address");
+    }
     return { ok: true, address: data.address };
   });
 
