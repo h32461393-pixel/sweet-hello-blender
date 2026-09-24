@@ -12,7 +12,7 @@ import { getPayoutProof } from "@/lib/farm.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { LANGS, setLang, t, useLang, type LangCode } from "@/lib/i18n";
-import { COMMUNITY_URL, MINI_APP_URL, PAYMENT_URL, PUBLIC_APP_URL } from "@/lib/constants";
+import { COMMUNITY_URL, MINI_APP_URL, PAYMENT_URL, SITE_URL } from "@/lib/constants";
 import { openLink } from "@/lib/telegram-client";
 import {
   ArrowLeft,
@@ -486,7 +486,7 @@ export function ProfileTab() {
       <Row
         icon={ShieldCheck}
         label="Public payout proof"
-        onClick={() => openLink(`${PUBLIC_APP_URL}/payouts`)}
+        onClick={() => openLink(`${SITE_URL}/payouts`)}
       />
 
       <SectionTitle>{t(lang, "preferences")}</SectionTitle>
