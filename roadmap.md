@@ -26,3 +26,5 @@
 - [x] Remove the fragile embedded referral-name relationship query
 - [x] Fall back to a text welcome when the Telegram banner cannot be delivered
 - [x] Log safe Telegram API errors for webhook diagnosis
+- [x] Document every required self-hosted database update in execution order
+- [x] Verify referral, ads and withdrawal database functions exist on the connected backend
