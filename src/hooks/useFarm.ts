@@ -82,6 +82,7 @@ export function useClaimAdView() {
   return useMutation({
     mutationFn: (args: {
       source: "adsgram" | "adsgram_int" | "monetag" | "gigapub" | "site";
+      siteId?: string;
     }) =>
       fn({ data: { ...args, initData: getInitData() } }),
     onSettled: () => {
