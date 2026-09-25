@@ -28,6 +28,7 @@
 - [x] Log safe Telegram API errors for webhook diagnosis
 - [x] Document every required self-hosted database update in execution order
 - [x] Verify referral, ads and withdrawal database functions exist on the connected backend
+- [x] Add a rerunnable repair script for failed SQL updates 0002, 0004 and 0005
 
 ## Sept 24 request
 - [x] Clear save errors (missing database updates / wrong server key are now named)

@@ -22,6 +22,10 @@
 3. Project URL, public publishable key සහ private server/service-role key එක copy කර ආරක්ෂිතව තබන්න.
 4. Private server key එක browser variable එකකට හෝ `VITE_` prefix එකක් සහිත variable එකකට දමන්න එපා.
 
+### `0002`, `0004`, `0005` run නොවුණොත්
+
+`docs/SQL-REPAIR-0002-0004-0005.sql` file එක **Select All → Copy** කර SQL editor එකේ එකවර run කරන්න. මෙය අතරමඟ නතර වූ කලින් run එකක් තිබුණත් නැවත run කළ හැක. Screenshot එකේ පෙන්වන පරිදි අවසාන `GRANT ... TO service_role;` පේළියට පසුව අමතර `)` එකක් එක් නොකරන්න.
+
 මෙම migrations සියල්ල tables, grants, row-level security, balance protection, rewards, referrals, ads සහ withdrawals සකස් කරයි.
 
 ## 3. GitHub සහ Vercel
