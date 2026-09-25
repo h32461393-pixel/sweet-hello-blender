@@ -35,10 +35,18 @@ export function Splash({ onReady, run }: { onReady: () => void; run?: () => Prom
 
     const boot = async () => {
       try {
-        if (typeof navigator !== "undefined" && navigator.onLine === false) {
-          throw new Error("You appear to be offline. Check your connection and try again.");
+        // navigator.onLine is unreliable inside Telegram's Android WebView,
+        // so we always try the real request and retry once on a network blip.
+        if (run) {
+          try {
+            await run();
+          } catch (err) {
+            const m = err instanceof Error ? err.message : "";
+            if (!/fetch|network|Failed/i.test(m)) throw err;
+            await new Promise((r) => window.setTimeout(r, 1200));
+            await run();
+          }
         }
-        if (run) await run();
         else await new Promise((r) => window.setTimeout(r, 1200));
         if (cancelled) return;
         setProgress(100);
