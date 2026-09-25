@@ -43,7 +43,75 @@ export const Route = createFileRoute("/admin")({
 type Creds = { initData: string; username: string; password: string };
 const SESSION_KEY = "foxfarm.admin";
 
-const TABS = ["Overview", "Users", "Payouts", "Tasks", "Ads", "Codes", "Notify", "Log"] as const;
+const TABS = ["Overview", "Users", "Payouts", "Tasks", "Ads", "Sites", "Codes", "Notify", "Log"] as const;
+
+type SiteRow = { id: string; title: string; url: string; reward: number; icon: string };
+
+function Sites({ creds }: { creds: Creds }) {
+  const getFn = useServerFn(adminGetConfig);
+  const setFn = useServerFn(adminSetConfig);
+  const qc = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ["admin-sites"],
+    queryFn: () => getFn({ data: { ...creds, key: "sites" } }),
+  });
+  const items: SiteRow[] = (() => {
+    try {
+      const v = JSON.parse(data?.json ?? "{}") as { items?: SiteRow[] };
+      return Array.isArray(v.items) ? v.items : [];
+    } catch {
+      return [];
+    }
+  })();
+  const [title, setTitle] = useState("");
+  const [url, setUrl] = useState("");
+  const [reward, setReward] = useState("20");
+  const [icon, setIcon] = useState("");
+  const save = useMutation({
+    mutationFn: (next: SiteRow[]) => setFn({ data: { ...creds, key: "sites", value: { items: next } } }),
+    onSuccess: () => { toast.success("Websites saved"); qc.invalidateQueries({ queryKey: ["admin-sites"] }); },
+    onError: (e) => toast.error((e as Error).message),
+  });
+  function add() {
+    if (!title.trim() || !/^https?:\/\//i.test(url.trim())) return toast.error("Enter a title and a valid link");
+    const id = `s${Date.now().toString(36)}`;
+    save.mutate([...items, { id, title: title.trim(), url: url.trim(), reward: Number(reward) || 0, icon: icon.trim() }]);
+    setTitle(""); setUrl(""); setIcon("");
+  }
+  return (
+    <div className="space-y-3">
+      <Card>
+        <p className="mb-2 text-sm font-black">🌐 Add a website</p>
+        <p className="mb-2 text-xs text-muted-foreground">Users watch it for 10 seconds, get the reward, then can visit again after 24 hours.</p>
+        <div className="space-y-2">
+          <Field label="Title" value={title} onChange={setTitle} placeholder="My partner site" />
+          <Field label="Link" value={url} onChange={setUrl} placeholder="https://…" />
+          <Field label="Reward (FOX)" value={reward} onChange={setReward} type="number" />
+          <Field label="Icon link (optional, imgbb ok)" value={icon} onChange={setIcon} placeholder="https://i.ibb.co/…" />
+          <button onClick={add} className="w-full rounded-xl bg-primary py-2 text-sm font-black text-primary-foreground">Add website</button>
+        </div>
+      </Card>
+      {items.map((s) => (
+        <Card key={s.id}>
+          <div className="flex items-center gap-3">
+            {s.icon ? <img src={s.icon} alt="" className="h-9 w-9 rounded-lg object-cover" /> : <span className="text-2xl">🌐</span>}
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-black">{s.title}</p>
+              <p className="truncate text-[11px] text-muted-foreground">{s.url} · +{s.reward} FOX</p>
+            </div>
+            <button
+              onClick={() => save.mutate(items.filter((x) => x.id !== s.id))}
+              className="rounded-lg bg-destructive px-2 py-1 text-xs font-bold text-destructive-foreground"
+            >
+              Delete
+            </button>
+          </div>
+        </Card>
+      ))}
+      {!items.length && <p className="text-center text-xs text-muted-foreground">No websites yet.</p>}
+    </div>
+  );
+}
 type Tab = (typeof TABS)[number];
 
 function Field(props: {
@@ -153,6 +221,7 @@ function Panel({ creds, onLogout }: { creds: Creds; onLogout: () => void }) {
       {tab === "Payouts" && <Payouts creds={creds} />}
       {tab === "Tasks" && <Tasks creds={creds} />}
       {tab === "Ads" && <Ads creds={creds} />}
+      {tab === "Sites" && <Sites creds={creds} />}
       {tab === "Codes" && <Codes creds={creds} />}
       {tab === "Notify" && <Notify creds={creds} />}
       {tab === "Log" && <Log creds={creds} />}
@@ -273,7 +342,12 @@ function Payouts({ creds }: { creds: Creds }) {
   const process = useMutation({
     mutationFn: (v: { id: string; action: "paid" | "rejected"; txid?: string }) =>
       processFn({ data: { ...creds, ...v } }),
-    onSuccess: () => { toast.success("Done"); qc.invalidateQueries({ queryKey: ["admin-wd"] }); },
+    onSuccess: (r) => {
+      if (r.channelPosted === false) {
+        toast.error("Paid ✅ but the payment channel post failed — make the bot an admin of the channel (or set PAYMENT_CHANNEL_ID).");
+      } else toast.success(r.channelPosted ? "Paid ✅ and posted to the payment channel" : "Done");
+      qc.invalidateQueries({ queryKey: ["admin-wd"] });
+    },
     onError: (e) => toast.error((e as Error).message),
   });
 
