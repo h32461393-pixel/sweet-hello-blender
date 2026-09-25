@@ -438,6 +438,21 @@ export const getAdsState = createServerFn({ method: "POST" })
     const count = (s: string) => list.filter((r) => r.source === s).length;
     const earnedToday = list.reduce((sum, r) => sum + Number(r.reward ?? 0), 0);
 
+    const sites = await siteList(ctx.db);
+    const since = new Date(Date.now() - SITE_COOLDOWN_MS).toISOString();
+    const { data: visits } = await ctx.db
+      .from("task_completions")
+      .select("task_key, created_at")
+      .eq("user_id", u.id)
+      .like("task_key", "site:%")
+      .gte("created_at", since);
+    const lastVisit = new Map<string, number>();
+    for (const v of visits ?? []) {
+      const t = new Date(String(v.created_at)).getTime();
+      const k = String(v.task_key);
+      if (t > (lastVisit.get(k) ?? 0)) lastVisit.set(k, t);
+    }
+
     return {
       balance: Number(u.balance ?? 0),
       earnedToday,
@@ -450,16 +465,40 @@ export const getAdsState = createServerFn({ method: "POST" })
         used: count(id),
       })),
       site: { reward: cfg.siteReward, used: count("site"), cap: cfg.siteDailyCap },
+      sites: sites.map((s) => {
+        const last = lastVisit.get(`site:${s.id}`);
+        return { ...s, nextAt: last ? last + SITE_COOLDOWN_MS : 0 };
+      }),
     };
   });
 
+const SITE_COOLDOWN_MS = 24 * 3600 * 1000;
+type SiteItem = { id: string; title: string; url: string; reward: number; icon: string };
+
+/** Admin-managed website list stored in app_config key "sites". */
+async function siteList(db: Ctx["db"]): Promise<SiteItem[]> {
+  const c = (await getConfig(db, "sites")) as unknown as { items?: Partial<SiteItem>[] };
+  return (Array.isArray(c.items) ? c.items : [])
+    .filter((s) => s && /^[a-z0-9_-]{1,40}$/i.test(String(s.id)) && /^https?:\/\//i.test(String(s.url)))
+    .slice(0, 50)
+    .map((s) => ({
+      id: String(s.id),
+      title: String(s.title ?? "Website").slice(0, 80),
+      url: String(s.url),
+      reward: Math.max(0, Math.min(10000, Math.trunc(Number(s.reward ?? 10)) || 0)),
+      icon: String(s.icon ?? ""),
+    }));
+}
+
 /** Called only after the provider confirms the view; the server re-checks everything. */
 export const claimAdView = createServerFn({ method: "POST" })
-  .inputValidator((d: { initData: string; source: AdSource | "site" }) => {
+  .inputValidator((d: { initData: string; source: AdSource | "site"; siteId?: string }) => {
     if (typeof d?.initData !== "string" || !d.initData) throw new Error("Invalid session");
     const ok = d?.source === "site" || (AD_SOURCES as readonly string[]).includes(d?.source);
     if (!ok) throw new Error("Invalid request");
-    return { initData: d.initData, source: d.source };
+    const siteId = String(d?.siteId ?? "");
+    if (d.source === "site" && !/^[a-z0-9_-]{1,40}$/i.test(siteId)) throw new Error("Invalid request");
+    return { initData: d.initData, source: d.source, siteId };
   })
   .handler(async ({ data }) => {
     const ctx = await loadCtx(data.initData);
@@ -468,12 +507,31 @@ export const claimAdView = createServerFn({ method: "POST" })
     const cfg = await adsConfig(ctx.db);
     const net = data.source === "site" ? null : cfg.networks[data.source];
 
+    let siteReward = 0;
+    if (data.source === "site") {
+      const site = (await siteList(ctx.db)).find((s) => s.id === data.siteId);
+      if (!site) throw new Error("This website is no longer available");
+      const key = `site:${site.id}`;
+      const since = new Date(Date.now() - SITE_COOLDOWN_MS).toISOString();
+      const { data: recent } = await ctx.db
+        .from("task_completions")
+        .select("created_at")
+        .eq("user_id", u.id)
+        .eq("task_key", key)
+        .gte("created_at", since)
+        .limit(1);
+      if ((recent ?? []).length) throw new Error("You can visit this site again after 24 hours");
+      const ins = await ctx.db.from("task_completions").insert({ task_key: key, user_id: u.id, day: todayUTC() });
+      if (ins.error) throw new Error("You can visit this site again after 24 hours");
+      siteReward = site.reward;
+    }
+
     const res = await ctx.db.rpc("claim_ad_view_v1", {
       _user_id: u.id,
       _source: data.source,
-      _reward: net ? net.reward : cfg.siteReward,
-      _daily_cap: net ? net.cap : cfg.siteDailyCap,
-      _cooldown_seconds: net ? net.cooldown : cfg.siteCooldownSeconds,
+      _reward: net ? net.reward : siteReward,
+      _daily_cap: net ? net.cap : 1000,
+      _cooldown_seconds: net ? net.cooldown : 0,
     });
     if (res.error) throw new Error(rpcMessage(res.error, "Could not verify this view"));
     const out = res.data as { reward: number; balance: number; used: number; cap: number };
@@ -765,22 +823,38 @@ export const createWithdrawal = createServerFn({ method: "POST" })
     });
     if (res.error) throw new Error(rpcMessage(res.error, "Could not create the withdrawal"));
 
-    const out = res.data as { id: string; net_usd: number; gross_usd: number; fee_usd: number };
+    // The database returns { id, gross, fee, net } (older builds: *_usd).
+    const raw = (res.data ?? {}) as Record<string, unknown>;
+    const pick = (a: string, b: string) => {
+      const v = Number(raw[a] ?? raw[b]);
+      return Number.isFinite(v) ? v : NaN;
+    };
+    let gross = pick("gross", "gross_usd");
+    let fee = pick("fee", "fee_usd");
+    let netUsd = pick("net", "net_usd");
+    if (!Number.isFinite(netUsd)) {
+      gross = data.tokens / cfg.tokensPerUsd;
+      fee = cfg.feeFlat + (gross * cfg.feePercent) / 100;
+      netUsd = gross - fee;
+    }
+    const address = String(u.wallet_address ?? "");
+    const who = ctx.tg.username ? `@${ctx.tg.username}` : (ctx.tg.first_name ?? "User");
     try {
       const { sendMessage } = await import("./telegram.server");
       await sendMessage(
         ctx.tg.id,
-        `💸 <b>Withdrawal requested</b>\n\n🪙 ${data.tokens.toLocaleString()} FOX\n💵 You receive: <b>$${Number(out.net_usd).toFixed(4)}</b>\n⏳ Status: pending admin approval\n\nYou will get a message here as soon as it is paid. 🦊`,
+        `💸 <b>Withdrawal requested</b>\n\n🪙 ${data.tokens.toLocaleString()} FOX\n💰 Amount: $${gross.toFixed(4)}\n🧾 Fee: -$${fee.toFixed(4)}\n💵 You receive: <b>$${netUsd.toFixed(4)} USDT</b>\n📬 <code>${address}</code>\n⏳ Status: pending admin approval\n\nYou will get a message here as soon as it is paid. 🦊`,
+        [[{ text: "🦊 Open Mini App", url: MINI_APP_URL }]],
+      );
+      await sendMessage(
+        ADMIN_TELEGRAM_ID,
+        `🆕 <b>New withdrawal request</b>\n\n👤 ${who} (<code>${ctx.tg.id}</code>)\n🪙 ${data.tokens.toLocaleString()} FOX\n💰 Gross: $${gross.toFixed(4)}\n🧾 Fee: $${fee.toFixed(4)}\n💵 Pay: <b>$${netUsd.toFixed(4)} USDT</b> (BEP-20)\n📬 <code>${address}</code>`,
+        [[{ text: "🛠 Open admin panel", url: `${SITE_URL}/admin` }]],
       );
     } catch {
       /* notification is best-effort */
     }
-    return {
-      id: String(out.id),
-      net: Number(out.net_usd),
-      gross: Number(out.gross_usd),
-      fee: Number(out.fee_usd),
-    };
+    return { id: String(raw["id"] ?? ""), net: netUsd, gross, fee };
   });
 
 /* ---------------------------------------------------------------------------
