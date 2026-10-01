@@ -170,28 +170,37 @@
   --wood: oklch(0.42 0.07 60);
 }
 .dark {
-  --background: oklch(0.2 0.03 120);
-  --foreground: oklch(0.96 0.02 100);
-  --card: oklch(0.26 0.035 120);
-  --card-foreground: oklch(0.96 0.02 100);
-  --popover: oklch(0.26 0.035 120);
-  --popover-foreground: oklch(0.96 0.02 100);
-  --primary: oklch(0.73 0.19 45);
-  --primary-foreground: oklch(0.18 0.03 60);
-  --secondary: oklch(0.32 0.05 130);
-  --secondary-foreground: oklch(0.95 0.02 110);
-  --muted: oklch(0.3 0.03 120);
-  --muted-foreground: oklch(0.72 0.03 100);
-  --accent: oklch(0.8 0.16 90);
-  --accent-foreground: oklch(0.2 0.04 60);
-  --border: oklch(1 0 0 / 12%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.73 0.19 45);
-  --usdt: oklch(0.68 0.13 165);
+  /* Night farm: deep forest greens, warm lantern orange, harvest gold */
+  --background: oklch(0.18 0.03 155);
+  --foreground: oklch(0.95 0.02 100);
+  --card: oklch(0.235 0.035 155);
+  --card-foreground: oklch(0.95 0.02 100);
+  --popover: oklch(0.235 0.035 155);
+  --popover-foreground: oklch(0.95 0.02 100);
+  --primary: oklch(0.72 0.18 45);
+  --primary-foreground: oklch(0.17 0.03 50);
+  --secondary: oklch(0.31 0.055 150);
+  --secondary-foreground: oklch(0.93 0.03 140);
+  --muted: oklch(0.27 0.03 155);
+  --muted-foreground: oklch(0.74 0.03 130);
+  --accent: oklch(0.8 0.15 88);
+  --accent-foreground: oklch(0.2 0.04 70);
+  --destructive: oklch(0.66 0.2 25);
+  --destructive-foreground: oklch(0.98 0.01 90);
+  --border: oklch(0.36 0.04 150);
+  --input: oklch(0.36 0.04 150);
+  --ring: oklch(0.72 0.18 45);
+  --usdt: oklch(0.7 0.14 165);
   --usdt-foreground: oklch(0.15 0.02 165);
-  --barn: oklch(0.5 0.16 30);
-  --wood: oklch(0.38 0.07 60);
+  --barn: oklch(0.58 0.16 30);
+  --wood: oklch(0.5 0.07 60);
 }
+.dark body {
+  background-image:
+    radial-gradient(60rem 30rem at 100% -10%, color-mix(in oklch, var(--primary) 14%, transparent), transparent 60%),
+    radial-gradient(50rem 30rem at -10% 10%, color-mix(in oklch, var(--secondary) 60%, transparent), transparent 60%);
+}
+html, body { transition: background-color .3s ease, color .3s ease; }
 @theme inline {
   --color-usdt: var(--usdt);
   --color-usdt-foreground: var(--usdt-foreground);
