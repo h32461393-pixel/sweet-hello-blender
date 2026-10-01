@@ -11,6 +11,8 @@ import { ReferTab } from "@/components/tabs/ReferTab";
 import { ProfileTab } from "@/components/tabs/ProfileTab";
 import { syncUser } from "@/lib/farm.functions";
 import { getInitData, getWebApp } from "@/lib/telegram-client";
+import { MINI_APP_URL, BOT_USERNAME, assetUrl } from "@/lib/constants";
+import logo from "@/assets/fox-logo.png.asset.json";
 
 
 export const Route = createFileRoute("/")({
@@ -40,6 +42,7 @@ function Index() {
   const onReady = useCallback(() => setReady(true), []);
   const sync = useServerFn(syncUser);
   const [suspended, setSuspended] = useState<string | null>(null);
+  const [outside, setOutside] = useState(false);
 
   const run = useCallback(async () => {
     const wa = getWebApp();
@@ -47,13 +50,16 @@ function Index() {
     wa?.expand();
     const initData = getInitData();
     if (!initData) {
-      throw new Error("Please open Fox Farm inside Telegram from @Fox_farm1_bot.");
+      // Opened in a normal browser (not Telegram): show a welcome page instead of an error.
+      setOutside(true);
+      return;
     }
     const res = await sync({ data: { initData, device: await deviceId() } });
     if (res.user.suspended) setSuspended(res.user.suspendReason ?? "Your account was suspended.");
   }, [sync]);
 
   if (!ready) return <Splash onReady={onReady} run={run} />;
+  if (outside) return <OpenInTelegram />;
   if (suspended)
     return (
       <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background p-8 text-center">
@@ -79,6 +85,33 @@ function Index() {
     </>
   );
 
+}
+
+function OpenInTelegram() {
+  return (
+    <main className="flex min-h-screen flex-col items-center justify-center gap-5 bg-background p-8 text-center">
+      <img src={assetUrl(logo.url)} alt="Fox Farm" className="animate-fox-bob w-44 drop-shadow-xl" />
+      <h1 className="text-3xl font-bold text-foreground">Fox Farm 🦊</h1>
+      <p className="max-w-sm text-muted-foreground">
+        Fox Farm is a Telegram Mini App. Mine FOX every hour, complete tasks, invite friends,
+        watch rewarded ads and withdraw USDT (BEP-20).
+      </p>
+      <a
+        href={MINI_APP_URL}
+        className="rounded-2xl bg-primary px-6 py-3 font-semibold text-primary-foreground shadow-lg"
+      >
+        Open in Telegram
+      </a>
+      <div className="flex gap-4 text-sm">
+        <a href={`https://t.me/${BOT_USERNAME}`} className="text-primary underline">
+          @{BOT_USERNAME}
+        </a>
+        <a href="/payouts" className="text-primary underline">
+          Payout proof
+        </a>
+      </div>
+    </main>
+  );
 }
 
 /** Stable per-device id (hash of device traits + a stored random seed). */
