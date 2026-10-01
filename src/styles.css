@@ -205,3 +205,27 @@
 @media (prefers-reduced-motion: reduce) {
   .animate-fox-bob { animation: none; }
 }
+
+/* Motion system */
+@keyframes fade-up { from { opacity: 0; transform: translateY(12px) } to { opacity: 1; transform: translateY(0) } }
+@keyframes pop-in { 0% { opacity: 0; transform: scale(.9) } 70% { transform: scale(1.03) } 100% { opacity: 1; transform: scale(1) } }
+@keyframes glow-pulse { 0%,100% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--primary) 45%, transparent) } 50% { box-shadow: 0 0 0 10px transparent } }
+@utility animate-fade-up { animation: fade-up .45s cubic-bezier(.2,.8,.2,1) both; }
+@utility animate-pop-in { animation: pop-in .4s cubic-bezier(.2,.8,.2,1) both; }
+@utility animate-glow { animation: glow-pulse 2.2s ease-in-out infinite; }
+@utility animate-shine { background-size: 200% 100%; animation: fox-shine 3s linear infinite; }
+
+@layer base {
+  body {
+    background-image:
+      radial-gradient(60rem 30rem at 100% -10%, color-mix(in oklch, var(--accent) 35%, transparent), transparent 60%),
+      radial-gradient(50rem 30rem at -10% 10%, color-mix(in oklch, var(--secondary) 70%, transparent), transparent 60%);
+    background-attachment: fixed;
+  }
+  button { transition: transform .15s ease, opacity .2s ease, background-color .2s ease; }
+  button:not(:disabled):active { transform: scale(.97); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-up, .animate-pop-in, .animate-glow, .animate-shine { animation: none; }
+}

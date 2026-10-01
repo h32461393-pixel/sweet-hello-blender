@@ -73,7 +73,7 @@ function Sites({ creds }: { creds: Creds }) {
     onError: (e) => toast.error((e as Error).message),
   });
   function add() {
-    if (!title.trim() || !/^https?:\/\//i.test(url.trim())) return toast.error("Enter a title and a valid link");
+    if (!title.trim() || !/^https?:\/\//i.test(url.trim())) { toast.error("Enter a title and a valid link"); return; }
     const id = `s${Date.now().toString(36)}`;
     save.mutate([...items, { id, title: title.trim(), url: url.trim(), reward: Number(reward) || 0, icon: icon.trim() }]);
     setTitle(""); setUrl(""); setIcon("");
