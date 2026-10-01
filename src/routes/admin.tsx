@@ -76,7 +76,7 @@ function Sites({ creds }: { creds: Creds }) {
     if (!title.trim() || !/^https?:\/\//i.test(url.trim())) { toast.error("Enter a title and a valid link"); return; }
     const id = `s${Date.now().toString(36)}`;
     save.mutate([...items, { id, title: title.trim(), url: url.trim(), reward: Number(reward) || 0, icon: icon.trim() }]);
-    setTitle(""); setUrl(""); setIcon("");
+    setTitle(""); setUrl(""); setIcon(""); return;
   }
   return (
     <div className="space-y-3">
