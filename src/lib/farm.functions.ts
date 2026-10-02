@@ -696,7 +696,7 @@ export const getPayoutProof = createServerFn({ method: "GET" }).handler(async ()
   const [paid, totals, top] = await Promise.all([
     db
       .from("withdrawals")
-      .select("net_usd, amount_tokens, txid, processed_at, app_users(username, first_name)")
+      .select("user_id, net_usd, amount_tokens, txid, processed_at")
       .eq("status", "paid")
       .order("processed_at", { ascending: false })
       .limit(50),
@@ -718,11 +718,18 @@ export const getPayoutProof = createServerFn({ method: "GET" }).handler(async ()
   const sum = (s: string) =>
     all.filter((w) => w.status === s).reduce((n, w) => n + Number(w.net_usd ?? 0), 0);
 
+  const paidRows = paid.data ?? [];
+  const userIds = [...new Set(paidRows.map((w) => w.user_id as string))];
+  const { data: users } = userIds.length
+    ? await db.from("app_users").select("id, username, first_name").in("id", userIds)
+    : { data: [] as { id: string; username: string | null; first_name: string | null }[] };
+  const byId = new Map((users ?? []).map((u) => [u.id, u]));
+
   return {
     totalPaidUsd: Number(sum("paid").toFixed(4)),
     pendingUsd: Number(sum("pending").toFixed(4)),
-    payouts: (paid.data ?? []).map((w) => ({
-      user: mask((w as { app_users?: { username?: string | null; first_name?: string | null } }).app_users ?? null),
+    payouts: paidRows.map((w) => ({
+      user: mask(byId.get(w.user_id as string) ?? null),
       usd: Number(w.net_usd ?? 0),
       tokens: Number(w.amount_tokens ?? 0),
       txid: (w.txid as string) ?? null,
