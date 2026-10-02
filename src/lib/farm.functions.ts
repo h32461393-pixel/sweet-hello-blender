@@ -696,7 +696,7 @@ export const getPayoutProof = createServerFn({ method: "GET" }).handler(async ()
   const [paid, totals, top] = await Promise.all([
     db
       .from("withdrawals")
-      .select("net_usd, amount_tokens, txid, processed_at, app_users(username, first_name)")
+      .select("user_id, net_usd, amount_tokens, txid, processed_at")
       .eq("status", "paid")
       .order("processed_at", { ascending: false })
       .limit(50),
