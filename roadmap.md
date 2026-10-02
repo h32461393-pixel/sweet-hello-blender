@@ -41,3 +41,8 @@
 - [x] Admin: saved reward codes list, per-user full activity view, suspend reason
 - [x] Bot: daily reminder + mining-ready notification (user sets up cron-job.org)
 - [ ] /start on Vercel: re-register webhook to the Vercel domain (user step)
+
+## Oct 2 request
+- [x] Show verified payout summary and recent completed payouts at the bottom of Home
+- [x] Point the withdrawal notification's admin button to the requested Telegram Mini App link
+- [x] Keep the theme toggle in the Home header only, clear of balances and other tabs
