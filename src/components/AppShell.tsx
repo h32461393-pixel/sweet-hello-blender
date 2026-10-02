@@ -1,8 +1,7 @@
 import { type ReactNode } from "react";
-import { Home, ListChecks, Play, Users, User, Sun, Moon } from "lucide-react";
+import { Home, ListChecks, Play, Users, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { t, useLang } from "@/lib/i18n";
-import { useTheme } from "@/lib/theme";
 
 export type TabKey = "home" | "tasks" | "ads" | "refer" | "profile";
 
@@ -24,30 +23,9 @@ export function AppShell({
   children: ReactNode;
 }) {
   const lang = useLang();
-  const { theme, toggle } = useTheme();
-  const dark = theme === "dark";
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-background shadow-2xl shadow-foreground/10 transition-colors duration-300">
       <div className="h-1.5 bg-primary" />
-      <button
-        type="button"
-        onClick={toggle}
-        aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
-        aria-pressed={dark}
-        className="fixed right-3 top-3 z-50 flex items-center gap-1.5 rounded-full border border-border bg-card/90 px-2.5 py-1.5 text-xs font-bold text-foreground shadow-md backdrop-blur"
-      >
-        <span className="relative grid h-5 w-9 items-center rounded-full bg-muted px-0.5">
-          <span
-            className={cn(
-              "grid h-4 w-4 place-items-center rounded-full bg-primary text-primary-foreground transition-transform duration-300",
-              dark && "translate-x-4",
-            )}
-          >
-            {dark ? <Moon className="h-2.5 w-2.5" /> : <Sun className="h-2.5 w-2.5" />}
-          </span>
-        </span>
-        {dark ? "Dark" : "Light"}
-      </button>
       <main className="flex-1 px-4 pb-28 pt-4">{children}</main>
 
       <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto max-w-md border-t border-border bg-card/95 px-2 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_-16px_var(--foreground)] backdrop-blur">
