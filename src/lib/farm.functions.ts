@@ -856,7 +856,7 @@ export const createWithdrawal = createServerFn({ method: "POST" })
       await sendMessage(
         ADMIN_TELEGRAM_ID,
         `🆕 <b>New withdrawal request</b>\n\n👤 ${who} (<code>${ctx.tg.id}</code>)\n🪙 ${data.tokens.toLocaleString()} FOX\n💰 Gross: $${gross.toFixed(4)}\n🧾 Fee: $${fee.toFixed(4)}\n💵 Pay: <b>$${netUsd.toFixed(4)} USDT</b> (BEP-20)\n📬 <code>${address}</code>`,
-        [[{ text: "🛠 Open admin panel", url: `${SITE_URL}/admin` }]],
+        [[{ text: "🛠 Open admin panel", url: "https://t.me/Fox_farm1_bot/fox" }]],
       );
     } catch {
       /* notification is best-effort */
