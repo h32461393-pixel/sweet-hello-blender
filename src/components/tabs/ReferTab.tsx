@@ -61,7 +61,7 @@ export function ReferTab() {
             try {
               await requireAd(randomNetwork);
             } catch (e) {
-              return toast.error(friendlyError(e));
+              { toast.error(friendlyError(e)); return; }
             }
             claim.mutate(undefined, {
               onSuccess: (r) => showRewardPopup(r.reward, "Referral rewards"),

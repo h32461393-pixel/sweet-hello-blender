@@ -161,7 +161,7 @@ export function HomeTab({ onTab }: { onTab?: (t: TabKey) => void }) {
               try {
                 await requireAd(randomAdsgram);
               } catch (e) {
-                return toast.error(friendlyError(e));
+                { toast.error(friendlyError(e)); return; }
               }
               claim.mutate({} as never, {
                 onSuccess: (r) => showRewardPopup(r.reward, "Mining"),
@@ -180,7 +180,7 @@ export function HomeTab({ onTab }: { onTab?: (t: TabKey) => void }) {
               try {
                 await requireAd(randomAdsgram);
               } catch (e) {
-                return toast.error(friendlyError(e));
+                { toast.error(friendlyError(e)); return; }
               }
               start.mutate({} as never, {
                 onSuccess: () => toast.success("⛏️ Mining started!"),
@@ -233,7 +233,7 @@ export function HomeTab({ onTab }: { onTab?: (t: TabKey) => void }) {
               try {
                 await requireAd(randomAdsgram);
               } catch (e) {
-                return toast.error(friendlyError(e));
+                { toast.error(friendlyError(e)); return; }
               }
               code.mutate({ code: codeValue } as never, {
                 onSuccess: (r) => {
