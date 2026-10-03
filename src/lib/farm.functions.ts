@@ -563,7 +563,7 @@ export const claimAdView = createServerFn({ method: "POST" })
         .single();
       if (view.error) {
         if (siteKey) await ctx.db.from("task_completions").delete().eq("user_id", u.id).eq("task_key", siteKey).eq("day", todayUTC());
-        throw new Error(dbHint(view.error, "Could not verify this view"));
+        throw new Error(dbHint(view.error) ?? "Could not verify this view");
       }
       const credit = await ctx.db.rpc("credit_user", {
         _user_id: u.id,

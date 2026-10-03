@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Play, Globe, Sparkles, Clock, CheckCircle2 } from "lucide-react";
+import { Loader2, Play, Globe, Sparkles, Clock, CheckCircle2, Timer } from "lucide-react";
 import { GuideCard } from "@/components/AppShell";
 import { cn } from "@/lib/utils";
 import { useAdsState, useClaimAdView, friendlyError } from "@/hooks/useFarm";
-import { adsEnabled, showRewardedAd } from "@/lib/adsgram";
+import { requireAd, showRewardPopup, useAdCooldown } from "@/components/AdGate";
+import type { AdNetwork } from "@/lib/adsgram";
 import { openLink } from "@/lib/telegram-client";
 
 const NETWORK_LOGOS: Record<string, string> = {
@@ -12,11 +13,10 @@ const NETWORK_LOGOS: Record<string, string> = {
   adsgram_int: "https://www.google.com/s2/favicons?domain=adsgram.ai&sz=128",
   monetag: "https://www.google.com/s2/favicons?domain=monetag.com&sz=128",
   gigapub: "https://www.google.com/s2/favicons?domain=gigapub.tech&sz=128",
+  monetix: "https://www.google.com/s2/favicons?domain=monetixads.online&sz=128",
 };
 
 const VISIT_SECONDS = 10;
-/** Ad networks are temporarily disabled until Adsgram approves the app. Set true to restore. */
-const AD_NETWORKS_ENABLED = false;
 type Section = "ads" | "sites";
 
 function fmt(ms: number) {
@@ -26,11 +26,13 @@ function fmt(ms: number) {
   const sec = String(s % 60).padStart(2, "0");
   return `${h}:${m}:${sec}`;
 }
+const usd = (n: number) => `$${n.toFixed(n < 0.1 ? 4 : 3)}`;
 
 export function AdsTab() {
   const { data, isLoading } = useAdsState();
   const claim = useClaimAdView();
-  const [section, setSection] = useState<Section>(AD_NETWORKS_ENABLED ? "ads" : "sites");
+  const cd = useAdCooldown();
+  const [section, setSection] = useState<Section>("ads");
   const [busy, setBusy] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(0);
   const [now, setNow] = useState(() => Date.now());
@@ -45,16 +47,12 @@ export function AdsTab() {
   }, []);
 
   async function watchAd(id: string, label: string) {
-    if (busy) return;
+    if (busy || cd.busy) return;
     setBusy(id);
     try {
-      if (id === "adsgram" || id === "adsgram_int") {
-        await showRewardedAd();
-      } else {
-        throw new Error(`${label} is being connected. Please try another one.`);
-      }
+      await requireAd(id as AdNetwork);
       const res = await claim.mutateAsync({ source: id as "adsgram" });
-      toast.success(`🎬 +${res.reward} FOX added`);
+      showRewardPopup(res.reward, label);
     } catch (e) {
       toast.error(friendlyError(e));
     } finally {
@@ -62,7 +60,7 @@ export function AdsTab() {
     }
   }
 
-  function visitSite(id: string, url: string) {
+  function visitSite(id: string, url: string, title: string) {
     if (busy) return;
     setBusy(`site:${id}`);
     openLink(url);
@@ -75,7 +73,7 @@ export function AdsTab() {
       if (timer.current) clearInterval(timer.current);
       try {
         const res = await claim.mutateAsync({ source: "site", siteId: id });
-        toast.success(`🌐 +${res.reward} FOX added`);
+        showRewardPopup(res.reward, title);
       } catch (e) {
         toast.error(friendlyError(e));
       } finally {
@@ -97,7 +95,19 @@ export function AdsTab() {
         </span>
       </div>
 
-      {AD_NETWORKS_ENABLED && (
+      {data && (
+        <div className="rounded-3xl bg-primary p-4 text-primary-foreground shadow-lg shadow-primary/20">
+          <p className="text-xs font-bold opacity-90">Watch every ad today and earn</p>
+          <div className="mt-1 flex items-end justify-between">
+            <p className="text-3xl font-black">{data.totalTokens.toLocaleString()} FOX</p>
+            <p className="text-lg font-black">≈ {usd(data.totalUsd)}</p>
+          </div>
+          <p className="mt-2 flex items-center gap-1 text-xs font-bold opacity-90">
+            <Timer className="h-3.5 w-3.5" /> Ads reset in {fmt(data.resetAt - now)}
+          </p>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-1 rounded-2xl bg-secondary p-1">
         {(["ads", "sites"] as const).map((s) => (
           <button
@@ -113,30 +123,25 @@ export function AdsTab() {
           </button>
         ))}
       </div>
-      )}
 
-      {AD_NETWORKS_ENABLED && section === "ads" ? (
+      {section === "ads" ? (
         <div className="space-y-3">
           {networks.map((n, i) => {
             const left = Math.max(0, n.cap - n.used);
-            const disabled = busy !== null || left === 0 || !adsEnabled();
+            const disabled = busy !== null || left === 0 || cd.busy;
             return (
-              <div
-                key={n.id}
-                style={{ animationDelay: `${i * 60}ms` }}
-                className="animate-fade-up rounded-3xl border border-border bg-card p-4"
-              >
+              <div key={n.id} style={{ animationDelay: `${i * 60}ms` }} className="animate-fade-up rounded-3xl border border-border bg-card p-4">
                 <div className="flex items-center gap-3">
                   {n.logo || NETWORK_LOGOS[n.id] ? (
                     <img src={n.logo || NETWORK_LOGOS[n.id]} alt={n.label} className="h-11 w-11 rounded-xl bg-muted object-cover p-1" loading="lazy" />
                   ) : (
-                    <span className="grid h-11 w-11 place-items-center rounded-xl bg-primary/10 text-primary">
-                      <Sparkles className="h-5 w-5" />
-                    </span>
+                    <span className="grid h-11 w-11 place-items-center rounded-xl bg-primary/10 text-primary"><Sparkles className="h-5 w-5" /></span>
                   )}
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-extrabold">{n.label}</p>
-                    <p className="text-xs text-muted-foreground">{n.used}/{n.cap} today</p>
+                    <p className="text-xs text-muted-foreground">
+                      {n.used}/{n.cap} today · total {n.totalTokens} FOX ≈ {usd(n.totalUsd)}
+                    </p>
                   </div>
                   <span className="rounded-full bg-usdt/15 px-2.5 py-1 text-xs font-black text-usdt">+{n.reward}</span>
                 </div>
@@ -146,19 +151,16 @@ export function AdsTab() {
                 <button
                   onClick={() => watchAd(n.id, n.label)}
                   disabled={disabled}
-                  className={cn("mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-3 font-bold text-primary-foreground", disabled && "opacity-50")}
+                  className={cn("mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-3 font-bold text-primary-foreground active:scale-[0.98]", disabled && "opacity-50")}
                 >
-                  {busy === n.id ? <Loader2 className="h-5 w-5 animate-spin" /> : <Play className="h-5 w-5" />}
-                  {left === 0 ? "Daily limit reached" : "Watch ad"}
+                  {busy === n.id ? <Loader2 className="h-5 w-5 animate-spin" /> : cd.left > 0 && left > 0 ? <Clock className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+                  {left === 0 ? `Resets in ${fmt((data?.resetAt ?? now) - now)}` : cd.left > 0 ? `Ready in ${cd.left}s` : "Watch ad"}
                 </button>
               </div>
             );
           })}
-          {!adsEnabled() && (
-            <p className="text-center text-[11px] text-muted-foreground">Ads are being connected. Everything else keeps working normally.</p>
-          )}
           <GuideCard title="How rewards are verified">
-            A reward is added only after the ad provider confirms a fully watched ad. Daily limits and a short cooldown apply.
+            A reward is added only after the ad network confirms a finished ad. No ad = no reward. Daily limits reset at 00:00 UTC.
           </GuideCard>
         </div>
       ) : (
@@ -182,7 +184,7 @@ export function AdsTab() {
                   <span className="rounded-full bg-usdt/15 px-2.5 py-1 text-xs font-black text-usdt">+{s.reward}</span>
                 </div>
                 <button
-                  onClick={() => visitSite(s.id, s.url)}
+                  onClick={() => visitSite(s.id, s.url, s.title)}
                   disabled={disabled || mine}
                   className={cn(
                     "mt-3 flex w-full items-center justify-center gap-2 rounded-2xl py-3 font-bold",
