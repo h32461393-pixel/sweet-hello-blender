@@ -95,7 +95,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     ],
     scripts: [
       { src: "https://telegram.org/js/telegram-web-app.js" },
-      { src: "https://sad.adsgram.ai/js/sad.min.js", async: true },
+      // Ad networks temporarily disabled until Adsgram approval.
+      // { src: "https://sad.adsgram.ai/js/sad.min.js", async: true },
     ],
   }),
 
