@@ -81,7 +81,7 @@ export function useClaimAdView() {
   const fn = useServerFn(claimAdView);
   return useMutation({
     mutationFn: (args: {
-      source: "adsgram" | "adsgram_int" | "monetag" | "gigapub" | "site";
+      source: "adsgram" | "adsgram_int" | "monetag" | "gigapub" | "monetix" | "site";
       siteId?: string;
     }) =>
       fn({ data: { ...args, initData: getInitData() } }),
@@ -131,6 +131,7 @@ export function useClaimReferralRewards() {
 
 export function friendlyError(e: unknown): string {
   const msg = e instanceof Error ? e.message : String(e ?? "");
+  if (msg.includes("AD_CANCELLED")) return "No ad watched — no reward given.";
   if (msg.includes("SUSPENDED")) return "Your account is suspended.";
   if (msg.includes("NOT_JOINED")) return "Please join the channel first, then try again.";
   if (!msg || msg.includes("fetch") || msg.includes("Failed")) return "Network error. Please try again.";

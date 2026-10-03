@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { friendlyError, useClaimReferralRewards, useProfileState } from "@/hooks/useFarm";
 import { MINI_APP_URL } from "@/lib/constants";
 import { openLink } from "@/lib/telegram-client";
+import { requireAd, showRewardPopup } from "@/components/AdGate";
+import { randomNetwork } from "@/lib/adsgram";
 
 export function ReferTab() {
   const { data, isLoading, error, refetch } = useProfileState();
@@ -55,10 +57,17 @@ export function ReferTab() {
         <Button
           variant="secondary"
           disabled={claim.isPending || refs.pendingTotal <= 0}
-          onClick={() => claim.mutate(undefined, {
-            onSuccess: (r) => toast.success(`🎉 +${r.reward.toLocaleString()} FOX claimed`),
-            onError: (e) => toast.error(friendlyError(e)),
-          })}
+          onClick={async () => {
+            try {
+              await requireAd(randomNetwork);
+            } catch (e) {
+              { toast.error(friendlyError(e)); return; }
+            }
+            claim.mutate(undefined, {
+              onSuccess: (r) => showRewardPopup(r.reward, "Referral rewards"),
+              onError: (e) => toast.error(friendlyError(e)),
+            });
+          }}
           className="mt-3 w-full"
         >
           {claim.isPending ? <Loader2 className="animate-spin" /> : <Check />}
