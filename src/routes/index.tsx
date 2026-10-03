@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { AdOverlay, requireAd } from "@/components/AdGate";
+import { preloadAds } from "@/lib/adsgram";
 import { useServerFn } from "@tanstack/react-start";
 import { Toaster } from "@/components/ui/sonner";
 import { Splash } from "@/components/Splash";
@@ -74,6 +76,7 @@ function Index() {
 
   return (
     <>
+      <HomeInterstitial tab={tab} />
       <AppShell tab={tab} onTab={setTab}>
         {tab === "home" && <HomeTab onTab={setTab} />}
         {tab === "tasks" && <TasksTab />}
@@ -81,10 +84,22 @@ function Index() {
         {tab === "refer" && <ReferTab />}
         {tab === "profile" && <ProfileTab />}
       </AppShell>
+      <AdOverlay />
       <Toaster position="top-center" />
     </>
   );
 
+}
+
+/** Adsgram interstitial on app open and every time the user returns to Home. */
+function HomeInterstitial({ tab }: { tab: TabKey }) {
+  useEffect(() => {
+    preloadAds();
+  }, []);
+  useEffect(() => {
+    if (tab === "home") requireAd("adsgram_int").catch(() => {});
+  }, [tab]);
+  return null;
 }
 
 function OpenInTelegram() {

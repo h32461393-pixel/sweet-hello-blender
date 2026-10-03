@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { friendlyError, useClaimReferralRewards, useProfileState } from "@/hooks/useFarm";
 import { MINI_APP_URL } from "@/lib/constants";
 import { openLink } from "@/lib/telegram-client";
+import { requireAd, showRewardPopup } from "@/components/AdGate";
+import { randomNetwork } from "@/lib/adsgram";
 
 export function ReferTab() {
   const { data, isLoading, error, refetch } = useProfileState();
