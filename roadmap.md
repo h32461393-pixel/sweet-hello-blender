@@ -40,7 +40,8 @@
 - [x] Real ad network logos; remove "Visit sites" ads
 - [x] Admin: saved reward codes list, per-user full activity view, suspend reason
 - [x] Bot: daily reminder + mining-ready notification (user sets up cron-job.org)
-- [ ] /start on Vercel: re-register webhook to the Vercel domain (user step)
+- [x] /start on Vercel: webhook points to the Vercel domain, no delivery errors (checked Oct 3)
+- [x] Ad networks temporarily disabled until Adsgram approval (re-enable: AD_NETWORKS_ENABLED + adsgram script in __root)
 
 ## Oct 2 request
 - [x] Show verified payout summary and recent completed payouts at the bottom of Home
