@@ -377,7 +377,7 @@ export const CHANNEL_LINKS = { community: COMMUNITY_URL, payment: PAYMENT_URL };
  * and a reward is only paid after the ad provider reports a completed view.
  * ------------------------------------------------------------------------- */
 
-export const AD_SOURCES = ["adsgram", "adsgram_int", "monetag", "gigapub"] as const;
+export const AD_SOURCES = ["adsgram", "adsgram_int", "monetag", "gigapub", "monetix"] as const;
 export type AdSource = (typeof AD_SOURCES)[number];
 
 type NetworkCfg = { label: string; reward: number; cap: number; cooldown: number; logo: string };
@@ -389,10 +389,11 @@ type AdsConfig = {
 };
 
 const DEFAULT_NETWORKS: Record<AdSource, NetworkCfg> = {
-  adsgram: { label: "Adsgram Reward", reward: 40, cap: 10, cooldown: 30, logo: "" },
-  adsgram_int: { label: "Adsgram Interstitial", reward: 40, cap: 10, cooldown: 30, logo: "" },
-  monetag: { label: "Monetag", reward: 30, cap: 10, cooldown: 30, logo: "" },
-  gigapub: { label: "GigaPub", reward: 30, cap: 10, cooldown: 30, logo: "" },
+  adsgram: { label: "Adsgram Reward", reward: 40, cap: 10, cooldown: 5, logo: "" },
+  adsgram_int: { label: "Adsgram Interstitial", reward: 40, cap: 10, cooldown: 5, logo: "" },
+  monetag: { label: "Monetag", reward: 40, cap: 10, cooldown: 5, logo: "" },
+  gigapub: { label: "GigaPub", reward: 40, cap: 10, cooldown: 5, logo: "" },
+  monetix: { label: "Monetix", reward: 40, cap: 10, cooldown: 5, logo: "" },
 };
 
 async function adsConfig(db: Ctx["db"]): Promise<AdsConfig> {
@@ -453,9 +454,18 @@ export const getAdsState = createServerFn({ method: "POST" })
       if (t > (lastVisit.get(k) ?? 0)) lastVisit.set(k, t);
     }
 
+    const wcfg = await getConfig(ctx.db, "withdraw");
+    const tokensPerUsd = Number(wcfg["tokens_per_usd"] ?? 100000) || 100000;
+    const totalTokens = AD_SOURCES.reduce((s, id) => s + cfg.networks[id]!.reward * cfg.networks[id]!.cap, 0);
+    const d = new Date();
+    const resetAt = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1);
     return {
       balance: Number(u.balance ?? 0),
       earnedToday,
+      tokensPerUsd,
+      totalTokens,
+      totalUsd: totalTokens / tokensPerUsd,
+      resetAt,
       networks: AD_SOURCES.map((id) => ({
         id,
         label: cfg.networks[id]!.label,
@@ -463,6 +473,8 @@ export const getAdsState = createServerFn({ method: "POST" })
         cap: cfg.networks[id]!.cap,
         logo: cfg.networks[id]!.logo,
         used: count(id),
+        totalTokens: cfg.networks[id]!.reward * cfg.networks[id]!.cap,
+        totalUsd: (cfg.networks[id]!.reward * cfg.networks[id]!.cap) / tokensPerUsd,
       })),
       site: { reward: cfg.siteReward, used: count("site"), cap: cfg.siteDailyCap },
       sites: sites.map((s) => {
@@ -507,31 +519,73 @@ export const claimAdView = createServerFn({ method: "POST" })
     const cfg = await adsConfig(ctx.db);
     const net = data.source === "site" ? null : cfg.networks[data.source];
 
-    let siteReward = 0;
-    if (data.source === "site") {
-      const site = (await siteList(ctx.db)).find((s) => s.id === data.siteId);
-      if (!site) throw new Error("This website is no longer available");
-      const key = `site:${site.id}`;
-      const since = new Date(Date.now() - SITE_COOLDOWN_MS).toISOString();
-      const { data: recent } = await ctx.db
-        .from("task_completions")
-        .select("created_at")
-        .eq("user_id", u.id)
-        .eq("task_key", key)
-        .gte("created_at", since)
-        .limit(1);
-      if ((recent ?? []).length) throw new Error("You can visit this site again after 24 hours");
-      const ins = await ctx.db.from("task_completions").insert({ task_key: key, user_id: u.id, day: todayUTC() });
-      if (ins.error) throw new Error("You can visit this site again after 24 hours");
-      siteReward = site.reward;
+    // Site visits and newer networks are paid here (works even on databases
+    // whose claim_ad_view_v1 predates them).
+    if (data.source === "site" || data.source === "monetix") {
+      let reward = 0;
+      let cap = 1000;
+      let siteKey = "";
+      if (data.source === "site") {
+        const site = (await siteList(ctx.db)).find((s) => s.id === data.siteId);
+        if (!site) throw new Error("This website is no longer available");
+        siteKey = `site:${site.id}`;
+        const since = new Date(Date.now() - SITE_COOLDOWN_MS).toISOString();
+        const { data: recent } = await ctx.db
+          .from("task_completions")
+          .select("created_at")
+          .eq("user_id", u.id)
+          .eq("task_key", siteKey)
+          .gte("created_at", since)
+          .limit(1);
+        if ((recent ?? []).length) throw new Error("You can visit this site again after 24 hours");
+        const ins = await ctx.db.from("task_completions").insert({ task_key: siteKey, user_id: u.id, day: todayUTC() });
+        if (ins.error) throw new Error("You can visit this site again after 24 hours");
+        reward = Math.max(1, Math.min(10000, site.reward || 1));
+      } else {
+        reward = net!.reward;
+        cap = net!.cap;
+        const { data: rows } = await ctx.db
+          .from("ad_views")
+          .select("created_at")
+          .eq("user_id", u.id)
+          .eq("source", "monetix")
+          .eq("day", todayUTC())
+          .order("created_at", { ascending: false });
+        const list = rows ?? [];
+        if (list.length >= cap) throw new Error("Daily limit reached");
+        const last = list[0] ? new Date(String(list[0].created_at)).getTime() : 0;
+        if (Date.now() - last < net!.cooldown * 1000) throw new Error("Please wait a moment");
+      }
+      const view = await ctx.db
+        .from("ad_views")
+        .insert({ user_id: u.id, source: data.source, day: todayUTC(), reward })
+        .select("id")
+        .single();
+      if (view.error) {
+        if (siteKey) await ctx.db.from("task_completions").delete().eq("user_id", u.id).eq("task_key", siteKey).eq("day", todayUTC());
+        throw new Error(dbHint(view.error, "Could not verify this view"));
+      }
+      const credit = await ctx.db.rpc("credit_user", {
+        _user_id: u.id,
+        _amount: reward,
+        _kind: data.source === "site" ? "site_visit" : "ad_view",
+        _note: `Rewarded ${data.source}`,
+        _key: `ad:${view.data.id}`,
+      });
+      if (credit.error) {
+        await ctx.db.from("ad_views").delete().eq("id", view.data.id);
+        if (siteKey) await ctx.db.from("task_completions").delete().eq("user_id", u.id).eq("task_key", siteKey).eq("day", todayUTC());
+        throw new Error(rpcMessage(credit.error, "Could not verify this view"));
+      }
+      return { reward, balance: Number(credit.data ?? 0), used: 0, cap };
     }
 
     const res = await ctx.db.rpc("claim_ad_view_v1", {
       _user_id: u.id,
       _source: data.source,
-      _reward: net ? net.reward : siteReward,
-      _daily_cap: net ? net.cap : 1000,
-      _cooldown_seconds: net ? net.cooldown : 0,
+      _reward: net!.reward,
+      _daily_cap: net!.cap,
+      _cooldown_seconds: net!.cooldown,
     });
     if (res.error) throw new Error(rpcMessage(res.error, "Could not verify this view"));
     const out = res.data as { reward: number; balance: number; used: number; cap: number };
