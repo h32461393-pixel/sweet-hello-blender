@@ -58,7 +58,7 @@ export function adsEnabled() {
 const controllers = new Map<string, AdController>();
 async function showAdsgram(blockId: string) {
   await loadScript("adsgram");
-  const w = window as W;
+  const w = window as unknown as W;
   if (!w.Adsgram) throw new Error("No ad available");
   let c = controllers.get(blockId);
   if (!c) {
@@ -74,7 +74,7 @@ function withTimeout<T>(p: Promise<T>, ms = 60_000): Promise<T> {
 }
 
 export async function showAd(net: AdNetwork): Promise<void> {
-  const w = window as W;
+  const w = window as unknown as W;
   switch (net) {
     case "adsgram":
       return showAdsgram(ADSGRAM_REWARD_BLOCK);
