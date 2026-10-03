@@ -808,14 +808,73 @@ const DEFAULT_WITHDRAW = {
 
 async function withdrawConfig(db: Ctx["db"]) {
   const c = await getConfig(db, "withdraw");
-  const n = (k: string, d: number) => (Number.isFinite(Number(c[k])) ? Number(c[k]) : d);
+  const n = (k: string, d: number) => (Number.isFinite(Number(c[k])) && c[k] !== "" ? Number(c[k]) : d);
   return {
     firstMin: n("first_min", DEFAULT_WITHDRAW.firstMin),
     nextMin: n("next_min", DEFAULT_WITHDRAW.nextMin),
     feeFlat: n("fee_flat", DEFAULT_WITHDRAW.feeFlat),
     feePercent: n("fee_percent", DEFAULT_WITHDRAW.feePercent),
     tokensPerUsd: n("tokens_per_usd", DEFAULT_WITHDRAW.tokensPerUsd),
+    minUsd: n("min_usd", 0.05),
+    maxUsd: n("max_usd", 0.5),
+    reqDailyAds: n("req_daily_ads", 30),
+    reqReferrals: n("req_referrals", 2),
+    reqDailyTasks: n("req_daily_tasks", 2),
   };
+}
+
+/** App-wide switches (admin Settings tab). */
+async function appSettings(db: Ctx["db"]) {
+  const c = await getConfig(db, "app");
+  return {
+    maintenance: c["maintenance"] === (true as never) || c["maintenance"] === "true",
+    withdrawalsEnabled: !(c["withdrawals_enabled"] === (false as never) || c["withdrawals_enabled"] === "false"),
+    notice: String(c["notice"] ?? "").slice(0, 300),
+    maintenanceText: String(c["maintenance_text"] ?? "We are upgrading Fox Farm. Please come back soon! 🦊").slice(0, 300),
+  };
+}
+
+/** Maintenance / notice state for the mini app (admin is never blocked). */
+export const getAppStatus = createServerFn({ method: "POST" })
+  .inputValidator(vInit)
+  .handler(async ({ data }) => {
+    const ctx = await loadCtx(data.initData);
+    const s = await appSettings(ctx.db);
+    const isAdmin = Number(ctx.tg.id) === ADMIN_TELEGRAM_ID;
+    return { ...s, maintenance: s.maintenance && !isAdmin, isAdmin };
+  });
+
+type WdCfg = Awaited<ReturnType<typeof withdrawConfig>>;
+
+async function withdrawRequirements(ctx: Ctx, userId: string, cfg: WdCfg) {
+  const today = todayUTC();
+  const [ads, refs, tasks, verified] = await Promise.all([
+    ctx.db.from("ad_views").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("day", today).neq("source", "site"),
+    ctx.db.from("referrals").select("id", { count: "exact", head: true }).eq("referrer_id", userId).eq("fake", false),
+    ctx.db
+      .from("task_completions")
+      .select("task_key")
+      .eq("user_id", userId)
+      .eq("day", today),
+    ctx.db.from("task_completions").select("task_key").eq("user_id", userId).eq("day", today).eq("task_key", "wd_verify"),
+  ]);
+  const taskCount = (tasks.data ?? []).filter((t) => {
+    const k = String(t.task_key);
+    return !k.startsWith("site:") && k !== "wd_verify";
+  }).length;
+  const items = [
+    { key: "ads", label: "Watch ads today", have: ads.count ?? 0, need: cfg.reqDailyAds },
+    { key: "refs", label: "Valid referrals", have: refs.count ?? 0, need: cfg.reqReferrals },
+    { key: "tasks", label: "Daily tasks today", have: taskCount, need: cfg.reqDailyTasks },
+  ].map((r) => ({ ...r, done: r.have >= r.need }));
+  return { items, allDone: items.every((r) => r.done), verifiedToday: (verified.data ?? []).length > 0 };
+}
+
+function tokenLimits(cfg: WdCfg, withdrawalCount: number) {
+  const base = withdrawalCount > 0 ? cfg.nextMin : cfg.firstMin;
+  const minTokens = Math.max(Math.ceil(cfg.minUsd * cfg.tokensPerUsd), Math.min(base, Math.ceil(cfg.minUsd * cfg.tokensPerUsd)));
+  const maxTokens = Math.floor(cfg.maxUsd * cfg.tokensPerUsd);
+  return { minTokens, maxTokens };
 }
 
 /** Everything the Withdraw screen needs. */
@@ -826,6 +885,8 @@ export const getWithdrawState = createServerFn({ method: "POST" })
     await rateLimit(ctx.db, "wd_state", ctx.tg.id, 60, 60);
     const u = await getUserRow(ctx);
     const cfg = await withdrawConfig(ctx.db);
+    const app = await appSettings(ctx.db);
+    const req = await withdrawRequirements(ctx, u.id, cfg);
 
     const { data: rows } = await ctx.db
       .from("withdrawals")
@@ -836,13 +897,21 @@ export const getWithdrawState = createServerFn({ method: "POST" })
 
     const list = rows ?? [];
     const done = Number((u as Record<string, unknown>)["withdrawal_count"] ?? 0);
+    const lim = tokenLimits(cfg, done);
     return {
       balance: Number(u.balance ?? 0),
       walletAddress: (u.wallet_address as string) ?? null,
-      minTokens: done > 0 ? cfg.nextMin : cfg.firstMin,
+      minTokens: lim.minTokens,
+      maxTokens: lim.maxTokens,
+      minUsd: cfg.minUsd,
+      maxUsd: cfg.maxUsd,
       feeFlat: cfg.feeFlat,
       feePercent: cfg.feePercent,
       tokensPerUsd: cfg.tokensPerUsd,
+      withdrawalsEnabled: app.withdrawalsEnabled,
+      requirements: req.items,
+      requirementsDone: req.allDone,
+      verifiedToday: req.verifiedToday,
       hasPending: list.some((w) => w.status === "pending"),
       history: list.map((w) => ({
         id: w.id as string,
@@ -855,6 +924,64 @@ export const getWithdrawState = createServerFn({ method: "POST" })
         at: w.created_at as string,
       })),
     };
+  });
+
+/**
+ * Activity check before the withdraw screen opens. Fake accounts are
+ * suspended with a reason; real users get today's withdraw access.
+ */
+export const verifyWithdrawUser = createServerFn({ method: "POST" })
+  .inputValidator(vInit)
+  .handler(async ({ data }) => {
+    const ctx = await loadCtx(data.initData);
+    await rateLimit(ctx.db, "wd_verify", ctx.tg.id, 10, 3600);
+    const u = await getUserRow(ctx);
+    const cfg = await withdrawConfig(ctx.db);
+    const req = await withdrawRequirements(ctx, u.id, cfg);
+    if (!req.allDone) throw new Error("Complete all withdrawal requirements first");
+
+    const reasons: string[] = [];
+    // 1. Balance must equal the ledger.
+    const { data: tx } = await ctx.db.from("transactions").select("amount").eq("user_id", u.id).limit(20000);
+    const ledger = (tx ?? []).reduce((s, r) => s + Number(r.amount ?? 0), 0);
+    if (ledger !== Number(u.balance ?? 0)) reasons.push("Balance does not match your activity history.");
+    // 2. Same device used by other accounts.
+    if (u.device_hash) {
+      const { count } = await ctx.db.from("app_users").select("id", { count: "exact", head: true }).eq("device_hash", u.device_hash).neq("id", u.id);
+      if ((count ?? 0) > 0) reasons.push("Multiple accounts on the same device are not allowed.");
+    }
+    // 3. Too many accounts from one network.
+    if (u.signup_ip) {
+      const { count } = await ctx.db.from("app_users").select("id", { count: "exact", head: true }).eq("signup_ip", u.signup_ip);
+      if ((count ?? 0) >= 4) reasons.push("Too many accounts from the same network.");
+    }
+    // 4. Mostly fake referrals.
+    const { data: refs } = await ctx.db.from("referrals").select("fake").eq("referrer_id", u.id);
+    const fakeRefs = (refs ?? []).filter((r) => r.fake).length;
+    if (fakeRefs >= 3 && fakeRefs > (refs ?? []).length / 2) reasons.push("Fake referrals detected.");
+    // 5. Impossible ad speed (more than 20 ads inside 2 minutes).
+    const { data: recentAds } = await ctx.db
+      .from("ad_views")
+      .select("created_at")
+      .eq("user_id", u.id)
+      .gte("created_at", new Date(Date.now() - 120_000).toISOString());
+    if ((recentAds ?? []).length > 20) reasons.push("Automated ad activity detected.");
+
+    if (reasons.length) {
+      const reason = reasons[0]!;
+      await ctx.db.from("app_users").update({ suspended: true, suspend_reason: reason }).eq("id", u.id);
+      try {
+        const { sendMessage } = await import("./telegram.server");
+        await sendMessage(ADMIN_TELEGRAM_ID, `🚨 <b>Auto-suspended at withdraw check</b>\n🆔 <code>${ctx.tg.id}</code>\n📝 ${reasons.join(" ")}`);
+      } catch {
+        /* best effort */
+      }
+      throw new Error("SUSPENDED");
+    }
+    if (!req.verifiedToday) {
+      await ctx.db.from("task_completions").insert({ task_key: "wd_verify", user_id: u.id, day: todayUTC() });
+    }
+    return { ok: true };
   });
 
 /** Creates a pending withdrawal; all checks happen inside the database. */
