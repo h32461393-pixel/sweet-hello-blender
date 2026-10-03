@@ -10,6 +10,8 @@ import { assetUrl, COMMUNITY_URL, PAYMENT_URL, SITE_URL } from "@/lib/constants"
 import { getPayoutProof } from "@/lib/farm.functions";
 import { openLink, haptic } from "@/lib/telegram-client";
 import { useTheme } from "@/lib/theme";
+import { requireAd, showRewardPopup } from "@/components/AdGate";
+import { randomAdsgram } from "@/lib/adsgram";
 import {
   useHomeState,
   useStartMining,
@@ -154,10 +156,15 @@ export function HomeTab({ onTab }: { onTab?: (t: TabKey) => void }) {
         {miningState.claimable ? (
           <button
             disabled={claim.isPending}
-            onClick={() => {
+            onClick={async () => {
               haptic();
+              try {
+                await requireAd(randomAdsgram);
+              } catch (e) {
+                return toast.error(friendlyError(e));
+              }
               claim.mutate({} as never, {
-                onSuccess: (r) => toast.success(`🎉 Claimed ${r.reward} FOX`),
+                onSuccess: (r) => showRewardPopup(r.reward, "Mining"),
                 onError: (e) => toast.error(friendlyError(e)),
               });
             }}
@@ -168,8 +175,13 @@ export function HomeTab({ onTab }: { onTab?: (t: TabKey) => void }) {
         ) : (
           <button
             disabled={miningState.running || start.isPending}
-            onClick={() => {
+            onClick={async () => {
               haptic();
+              try {
+                await requireAd(randomAdsgram);
+              } catch (e) {
+                return toast.error(friendlyError(e));
+              }
               start.mutate({} as never, {
                 onSuccess: () => toast.success("⛏️ Mining started!"),
                 onError: (e) => toast.error(friendlyError(e)),
@@ -217,15 +229,20 @@ export function HomeTab({ onTab }: { onTab?: (t: TabKey) => void }) {
           />
           <button
             disabled={code.isPending || !codeValue.trim()}
-            onClick={() =>
+            onClick={async () => {
+              try {
+                await requireAd(randomAdsgram);
+              } catch (e) {
+                return toast.error(friendlyError(e));
+              }
               code.mutate({ code: codeValue } as never, {
                 onSuccess: (r) => {
-                  toast.success(`🎟️ +${r.reward} FOX`);
+                  showRewardPopup(r.reward, "Reward code");
                   setCodeValue("");
                 },
                 onError: (e) => toast.error(friendlyError(e)),
-              })
-            }
+              });
+            }}
             className="rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground disabled:opacity-50"
           >
             {code.isPending ? "…" : "Claim"}

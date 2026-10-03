@@ -55,10 +55,17 @@ export function ReferTab() {
         <Button
           variant="secondary"
           disabled={claim.isPending || refs.pendingTotal <= 0}
-          onClick={() => claim.mutate(undefined, {
-            onSuccess: (r) => toast.success(`🎉 +${r.reward.toLocaleString()} FOX claimed`),
-            onError: (e) => toast.error(friendlyError(e)),
-          })}
+          onClick={async () => {
+            try {
+              await requireAd(randomNetwork);
+            } catch (e) {
+              return toast.error(friendlyError(e));
+            }
+            claim.mutate(undefined, {
+              onSuccess: (r) => showRewardPopup(r.reward, "Referral rewards"),
+              onError: (e) => toast.error(friendlyError(e)),
+            });
+          }}
           className="mt-3 w-full"
         >
           {claim.isPending ? <Loader2 className="animate-spin" /> : <Check />}
