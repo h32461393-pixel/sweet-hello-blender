@@ -15,6 +15,8 @@ const NETWORK_LOGOS: Record<string, string> = {
 };
 
 const VISIT_SECONDS = 10;
+/** Ad networks are temporarily disabled until Adsgram approves the app. Set true to restore. */
+const AD_NETWORKS_ENABLED = false;
 type Section = "ads" | "sites";
 
 function fmt(ms: number) {
@@ -28,7 +30,7 @@ function fmt(ms: number) {
 export function AdsTab() {
   const { data, isLoading } = useAdsState();
   const claim = useClaimAdView();
-  const [section, setSection] = useState<Section>("ads");
+  const [section, setSection] = useState<Section>(AD_NETWORKS_ENABLED ? "ads" : "sites");
   const [busy, setBusy] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(0);
   const [now, setNow] = useState(() => Date.now());
@@ -95,6 +97,7 @@ export function AdsTab() {
         </span>
       </div>
 
+      {AD_NETWORKS_ENABLED && (
       <div className="grid grid-cols-2 gap-1 rounded-2xl bg-secondary p-1">
         {(["ads", "sites"] as const).map((s) => (
           <button
@@ -110,8 +113,9 @@ export function AdsTab() {
           </button>
         ))}
       </div>
+      )}
 
-      {section === "ads" ? (
+      {AD_NETWORKS_ENABLED && section === "ads" ? (
         <div className="space-y-3">
           {networks.map((n, i) => {
             const left = Math.max(0, n.cap - n.used);
