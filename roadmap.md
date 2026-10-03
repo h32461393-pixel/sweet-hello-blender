@@ -49,11 +49,11 @@
 - [x] Keep the theme toggle in the Home header only, clear of balances and other tabs
 
 ## Oct 3 request — Ads back + pro upgrade
-- [ ] Re-enable ads: Adsgram reward 51743 / int-51744, Monetag, GigaPub, Monetix; no reward when no ad, "Try again"
-- [ ] Ads tab: per-network total tokens/$ summary, daily reset countdown, 5s cooldown on all buttons after an ad, reward popup
-- [ ] Ads on mining start/claim, reward code, referral claim (random); Adsgram int on app open and every Home visit
-- [ ] Withdraw flow: requirements (30 daily ads, 2 referrals, 2 daily tasks, min/max 0.5$) → 2 Adsgram ads → verify activity → open or auto-suspend fake
-- [ ] Fix Visit sites "could not verify" (reward not added)
+- [x] Re-enable ads: Adsgram reward 51743 / int-51744, Monetag, GigaPub, Monetix; no reward when no ad, "Try again"
+- [x] Ads tab: per-network total tokens/$ summary, daily reset countdown, 5s cooldown on all buttons after an ad, reward popup
+- [x] Ads on mining start/claim, reward code, referral claim (random); Adsgram int on app open and every Home visit
+- [ ] Withdraw flow: requirements (30 daily ads, 2 referrals, 2 daily tasks, min $0.05 / max $0.5, admin-editable) → 2 Adsgram ads → verify activity → open or auto-suspend fake
+- [x] Fix Visit sites "could not verify" (reward not added)
 - [ ] Admin Settings tab: all values, withdrawals on/off, maintenance mode (admin exempt), changes reflected live in app
 - [ ] Admin Users split Active / Suspended; better Overview with online users
 - [ ] Broadcast to all users + community channel, HTML, buttons, links, image
