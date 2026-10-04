@@ -117,7 +117,9 @@ export function TasksTab() {
   const tabs: { id: Section; label: string }[] = [
     { id: "daily", label: "Daily" },
     { id: "main", label: "Main" },
-    { id: "partner", label: "Partner" },
+    ...((taskData?.tasks ?? []).some((t) => t.section === "partner")
+      ? [{ id: "partner" as Section, label: "🤝 Partner" }]
+      : []),
   ];
 
   return (

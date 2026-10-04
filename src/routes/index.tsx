@@ -12,6 +12,7 @@ import { AdsTab } from "@/components/tabs/AdsTab";
 import { ReferTab } from "@/components/tabs/ReferTab";
 import { ProfileTab } from "@/components/tabs/ProfileTab";
 import { syncUser } from "@/lib/farm.functions";
+import { ChannelGate } from "@/components/ChannelGate";
 import { getInitData, getWebApp } from "@/lib/telegram-client";
 import { MINI_APP_URL, BOT_USERNAME, assetUrl } from "@/lib/constants";
 import logo from "@/assets/fox-logo.png.asset.json";
@@ -75,7 +76,7 @@ function Index() {
     );
 
   return (
-    <>
+    <ChannelGate>
       <HomeInterstitial tab={tab} />
       <AppShell tab={tab} onTab={setTab}>
         {tab === "home" && <HomeTab onTab={setTab} />}
@@ -86,7 +87,7 @@ function Index() {
       </AppShell>
       <AdOverlay />
       <Toaster position="top-center" />
-    </>
+    </ChannelGate>
   );
 
 }
