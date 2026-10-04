@@ -1,7 +1,7 @@
 import { dbHint } from "./db-errors";
 import { createServerFn } from "@tanstack/react-start";
 import { rateLimit, assertAdmin } from "./security.server";
-import { MINI_APP_URL, PAYMENT_URL } from "./constants";
+import { MINI_APP_URL, PAYMENT_URL, ADMIN_REFER_LINK } from "./constants";
 
 type Auth = { initData: string; username: string; password: string };
 
@@ -73,15 +73,20 @@ export const adminOverview = createServerFn({ method: "POST" })
   });
 
 export const adminSearchUsers = createServerFn({ method: "POST" })
-  .inputValidator((d: Auth & { q: string }) => ({ ...vAuth(d), q: String(d.q ?? "").slice(0, 60) }))
+  .inputValidator((d: Auth & { q: string; status?: string }) => ({
+    ...vAuth(d),
+    q: String(d.q ?? "").slice(0, 60),
+    status: d.status === "suspended" ? "suspended" : d.status === "active" ? "active" : "all",
+  }))
   .handler(async ({ data }) => {
     const ctx = await adminCtx(data);
     const q = data.q.trim();
     let query = ctx.db
       .from("app_users")
-      .select("id, telegram_id, username, first_name, balance, total_earned, suspended, wallet_address, created_at")
+      .select("id, telegram_id, username, first_name, balance, total_earned, suspended, suspend_reason, wallet_address, created_at")
       .order("created_at", { ascending: false })
-      .limit(25);
+      .limit(50);
+    if (data.status !== "all") query = query.eq("suspended", data.status === "suspended");
     if (q) {
       query = /^\d+$/.test(q)
         ? query.eq("telegram_id", Number(q))
@@ -98,6 +103,7 @@ export const adminSearchUsers = createServerFn({ method: "POST" })
         totalEarned: Number(u.total_earned ?? 0),
         suspended: Boolean(u.suspended),
         wallet: (u.wallet_address as string) ?? null,
+        suspendReason: (u.suspend_reason as string) ?? null,
       })),
     };
   });
@@ -528,4 +534,100 @@ export const adminUserActivity = createServerFn({ method: "POST" })
       referrals: (refs.data ?? []).map((r) => ({ status: String(r.status), fake: Boolean(r.fake), pending: Number(r.pending_reward), at: String(r.created_at) })),
       tasks: (tasks.data ?? []).map((r) => ({ key: String(r.task_key), at: String(r.created_at) })),
     };
+  });
+
+/* ---------------------------- Partner channels ---------------------------- */
+
+type Partner = { id: string; title: string; chat: string; referLink: string };
+
+function cleanChat(v: unknown) {
+  const c = String(v ?? "").trim().replace(/^https?:\/\/t\.me\//i, "@").slice(0, 64);
+  if (!/^(@[A-Za-z0-9_]{4,}|-?\d{5,})$/.test(c)) throw new Error("Use @channel or a numeric chat id");
+  return c;
+}
+
+export const adminListPartners = createServerFn({ method: "POST" })
+  .inputValidator(vAuth)
+  .handler(async ({ data }) => {
+    const ctx = await adminCtx(data);
+    const { data: row } = await ctx.db.from("app_config").select("value").eq("key", "partner_channels").maybeSingle();
+    const list = (Array.isArray(row?.value) ? row.value : []) as Partner[];
+    return { partners: list, defaultLink: ADMIN_REFER_LINK };
+  });
+
+export const adminSavePartners = createServerFn({ method: "POST" })
+  .inputValidator((d: Auth & { partners: Partner[] }) => {
+    vAuth(d);
+    if (!Array.isArray(d.partners) || d.partners.length > 50) throw new Error("Invalid list");
+    const partners = d.partners.map((p) => {
+      const link = String(p.referLink ?? "").trim().slice(0, 300);
+      if (link && !/^https:\/\//i.test(link)) throw new Error("Refer link must start with https://");
+      return {
+        id: String(p.id ?? crypto.randomUUID()).slice(0, 40),
+        title: String(p.title ?? "").trim().slice(0, 60) || "Partner",
+        chat: cleanChat(p.chat),
+        referLink: link,
+      };
+    });
+    return { ...d, partners };
+  })
+  .handler(async ({ data }) => {
+    const ctx = await adminCtx(data);
+    const { error } = await ctx.db
+      .from("app_config")
+      .upsert({ key: "partner_channels", value: data.partners as never }, { onConflict: "key" });
+    if (error) throw new Error(dbHint(error) ?? "Could not save");
+    await audit(ctx, "partners_save", null, { count: data.partners.length });
+    return { ok: true };
+  });
+
+/** Is the bot an admin (with post rights) in the channel? */
+export const adminCheckBotAdmin = createServerFn({ method: "POST" })
+  .inputValidator((d: Auth & { chat: string }) => ({ ...vAuth(d), chat: cleanChat(d.chat) }))
+  .handler(async ({ data }) => {
+    const ctx = await adminCtx(data);
+    const { tgCall } = await import("./telegram.server");
+    const me = await tgCall<{ id: number }>("getMe", {});
+    if (!me) throw new Error("Bot is not reachable");
+    const m = await tgCall<{ status: string; can_post_messages?: boolean }>("getChatMember", {
+      chat_id: data.chat,
+      user_id: me.id,
+    });
+    void ctx;
+    if (!m) return { admin: false, canPost: false, status: "not found" };
+    const admin = m.status === "administrator" || m.status === "creator";
+    return { admin, canPost: admin && m.can_post_messages !== false, status: m.status };
+  });
+
+/** Post an HTML message (optional image) with a refer-link button to one partner channel. */
+export const adminPostPartner = createServerFn({ method: "POST" })
+  .inputValidator(
+    (d: Auth & { chat: string; html: string; imageUrl?: string; buttonText?: string; referLink?: string }) => {
+      vAuth(d);
+      const html = String(d.html ?? "").trim().slice(0, 1000);
+      if (html.length < 3) throw new Error("Message is too short");
+      const imageUrl = String(d.imageUrl ?? "").trim().slice(0, 500);
+      if (imageUrl && !/^https:\/\//i.test(imageUrl)) throw new Error("Image link must start with https://");
+      const referLink = String(d.referLink ?? "").trim().slice(0, 300) || ADMIN_REFER_LINK;
+      if (!/^https:\/\//i.test(referLink)) throw new Error("Invalid refer link");
+      return {
+        ...d,
+        chat: cleanChat(d.chat),
+        html,
+        imageUrl,
+        referLink,
+        buttonText: String(d.buttonText ?? "").trim().slice(0, 40) || "🦊 Start earning",
+      };
+    },
+  )
+  .handler(async ({ data }) => {
+    const ctx = await adminCtx(data);
+    const { sendMessage, sendPhoto } = await import("./telegram.server");
+    const buttons = [[{ text: data.buttonText, url: data.referLink }]];
+    const res = data.imageUrl
+      ? await sendPhoto(data.chat, data.imageUrl, data.html, buttons)
+      : await sendMessage(data.chat, data.html, buttons);
+    if (!res) throw new Error("Telegram rejected the post — make sure the bot is admin and the HTML is valid");
+    await audit(ctx, "partner_post", data.chat, { image: Boolean(data.imageUrl) });
+    return { ok: true };
   });
