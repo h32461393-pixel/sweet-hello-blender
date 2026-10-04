@@ -21,3 +21,14 @@ export const PARTNER_SITES: { title: string; url: string }[] = [
   { title: "Fox Farm community channel", url: COMMUNITY_URL },
   { title: "Fox Farm payout proofs", url: PAYMENT_URL },
 ];
+
+/** Channels every user must join before using the mini app (bot must be admin in each). */
+export const REQUIRED_CHANNELS: { title: string; chat: string; url: string }[] = [
+  { title: "Fox Farm Community", chat: "@foxfarm_community", url: "https://t.me/foxfarm_community" },
+  { title: "Fox Farm Payment", chat: "@foxfarmpay", url: "https://t.me/foxfarmpay" },
+  { title: "Fox Farm Chat", chat: "@foxfarmchat", url: "https://t.me/foxfarmchat" },
+  { title: "Earning Hub", chat: "@EarningHub1236", url: "https://t.me/EarningHub1236" },
+];
+
+/** Admin's personal invite link used on partner-channel posts by default. */
+export const ADMIN_REFER_LINK = "https://t.me/Fox_farm1_bot/farm?startapp=ref5419054691";
