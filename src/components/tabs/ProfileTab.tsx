@@ -7,6 +7,7 @@ import {
   useProfileState,
   useSetWallet,
   useWithdrawState,
+  useVerifyWithdraw,
 } from "@/hooks/useFarm";
 import { getPayoutProof } from "@/lib/farm.functions";
 import { useServerFn } from "@tanstack/react-start";
@@ -98,6 +99,8 @@ export function ProfileTab() {
 
   const wd = useWithdrawState(screen === "withdraw");
   const wdMut = useCreateWithdrawal();
+  const verifyMut = useVerifyWithdraw();
+  const [wdStep, setWdStep] = useState<"req" | "form">("req");
   const [wdInput, setWdInput] = useState("");
 
   const [walletInput, setWalletInput] = useState<string | null>(null);
@@ -157,113 +160,153 @@ export function ProfileTab() {
     const fee = w ? w.feeFlat + (gross * w.feePercent) / 100 : 0;
     const net = Math.max(0, gross - fee);
     const canSend =
-      !!w && !w.hasPending && !!w.walletAddress && tokens >= w.minTokens && tokens <= w.balance;
+      !!w && !w.hasPending && !!w.walletAddress && tokens >= w.minTokens && tokens <= Math.min(w.balance, w.maxTokens);
+
+    if (wd.isLoading || !w) {
+      return (
+        <div>
+          <SubHeader title={t(lang, "back")} onBack={() => setScreen("main")} />
+          <p className="text-sm text-muted-foreground">Loading…</p>
+        </div>
+      );
+    }
+
+    // Step 1: requirements
+    if (wdStep === "req") {
+      return (
+        <div>
+          <SubHeader title={t(lang, "back")} onBack={() => setScreen("main")} />
+          <div className="rounded-3xl bg-gradient-to-br from-primary to-accent p-5 text-primary-foreground shadow-lg">
+            <div className="flex items-center gap-3">
+              <UsdtLogo className="h-12 w-12" />
+              <div>
+                <p className="text-xs opacity-80">Withdrawal requirements</p>
+                <p className="text-lg font-black">Complete all to continue</p>
+              </div>
+            </div>
+          </div>
+          <ul className="mt-3 space-y-2">
+            {w.requirements.map((r) => (
+              <li key={r.key} className="rounded-2xl border border-border bg-card p-3.5">
+                <div className="flex items-center justify-between text-sm font-bold">
+                  <span>{r.done ? "✅" : "⏳"} {r.label}</span>
+                  <span className={r.done ? "text-primary" : "text-muted-foreground"}>
+                    {Math.min(r.have, r.need)}/{r.need}
+                  </span>
+                </div>
+                <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-primary transition-all"
+                    style={{ width: `${Math.min(100, (r.have / Math.max(1, r.need)) * 100)}%` }}
+                  />
+                </div>
+              </li>
+            ))}
+            <li className="rounded-2xl border border-border bg-card p-3.5 text-xs text-muted-foreground">
+              💵 Min ${w.minUsd} · Max ${w.maxUsd} per withdrawal · from {w.minTokens.toLocaleString()} FOX
+            </li>
+          </ul>
+          {!w.withdrawalsEnabled ? (
+            <p className="mt-3 rounded-2xl bg-muted p-3 text-center text-xs font-semibold">⏸ Withdrawals are paused right now.</p>
+          ) : (
+            <button
+              disabled={!w.requirementsDone || verifyMut.isPending}
+              onClick={() =>
+                verifyMut.mutate(undefined, {
+                  onSuccess: () => setWdStep("form"),
+                  onError: (e) => {
+                    if (String((e as Error).message).includes("SUSPENDED")) window.location.reload();
+                    else toast.error(friendlyError(e));
+                  },
+                })
+              }
+              className="mt-3 w-full rounded-2xl bg-primary p-3.5 text-sm font-extrabold text-primary-foreground disabled:opacity-50"
+            >
+              {verifyMut.isPending ? "Verifying…" : w.requirementsDone ? "Continue →" : "Complete the requirements"}
+            </button>
+          )}
+          <WithdrawHistory items={w.history} />
+        </div>
+      );
+    }
 
     return (
       <div>
-        <SubHeader title={t(lang, "back")} onBack={() => setScreen("main")} />
-        <SectionTitle>💸 Withdraw USDT</SectionTitle>
+        <SubHeader title={t(lang, "back")} onBack={() => setWdStep("req")} />
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary to-accent p-5 text-primary-foreground shadow-lg">
+          <UsdtLogo className="absolute -right-4 -top-4 h-28 w-28 opacity-20" />
+          <p className="text-xs opacity-80">Available balance</p>
+          <p className="text-3xl font-black">{w.balance.toLocaleString()} FOX</p>
+          <p className="text-sm font-bold opacity-90">≈ ${(w.balance / w.tokensPerUsd).toFixed(4)} USDT</p>
+        </div>
 
-        {wd.isLoading || !w ? (
-          <p className="text-sm text-muted-foreground">Loading…</p>
-        ) : (
-          <>
-            <div className="rounded-3xl border border-border bg-card p-4">
-              <p className="text-xs text-muted-foreground">Available</p>
-              <p className="text-2xl font-black text-primary">
-                {w.balance.toLocaleString()} FOX
-              </p>
-              <p className="mt-1 text-[11px] text-muted-foreground">
-                Minimum {w.minTokens.toLocaleString()} FOX · {w.tokensPerUsd.toLocaleString()} FOX =
-                $1 · fee ${w.feeFlat} + {w.feePercent}%
-              </p>
+        <div className="mt-3 rounded-3xl border border-border bg-card p-4">
+          <div className="flex items-center gap-2 text-sm font-bold">
+            <UsdtLogo className="h-6 w-6" /> USDT · BNB Smart Chain (BEP-20)
+          </div>
+          {!w.walletAddress ? (
+            <button
+              onClick={() => setScreen("wallet")}
+              className="mt-3 w-full rounded-2xl bg-secondary p-3 text-sm font-bold text-secondary-foreground"
+            >
+              Add your USDT (BEP-20) address first
+            </button>
+          ) : (
+            <p className="mt-2 truncate rounded-xl bg-muted px-3 py-2 font-mono text-[11px] text-muted-foreground">
+              {w.walletAddress}
+            </p>
+          )}
 
-              {!w.walletAddress ? (
-                <button
-                  onClick={() => setScreen("wallet")}
-                  className="mt-3 w-full rounded-2xl bg-secondary p-3 text-sm font-bold text-secondary-foreground"
-                >
-                  Add your USDT (BEP-20) address first
-                </button>
-              ) : (
-                <p className="mt-2 truncate font-mono text-[11px] text-muted-foreground">
-                  {w.walletAddress}
-                </p>
-              )}
-
-              <input
-                value={wdInput}
-                onChange={(e) => setWdInput(e.target.value.replace(/[^0-9]/g, ""))}
-                inputMode="numeric"
-                placeholder={`${w.minTokens}`}
-                className="mt-3 w-full rounded-2xl border border-border bg-background p-3.5 text-sm outline-none focus:border-primary"
-              />
-              <div className="mt-2 flex justify-between text-xs text-muted-foreground">
-                <span>Fee ${fee.toFixed(4)}</span>
-                <span className="font-bold text-foreground">You get ${net.toFixed(4)}</span>
-              </div>
-
-              {w.hasPending ? (
-                <p className="mt-3 rounded-2xl bg-muted p-3 text-center text-xs font-semibold">
-                  ⏳ You already have a pending withdrawal.
-                </p>
-              ) : (
-                <button
-                  disabled={!canSend || wdMut.isPending}
-                  onClick={() =>
-                    wdMut.mutate(tokens, {
-                      onSuccess: (r) => {
-                        setWdInput("");
-                        toast.success(`💸 Request sent · $${r.net.toFixed(4)}`);
-                      },
-                      onError: (e) => toast.error(friendlyError(e)),
-                    })
-                  }
-                  className="mt-3 w-full rounded-2xl bg-primary p-3.5 text-sm font-extrabold text-primary-foreground disabled:opacity-50"
-                >
-                  {wdMut.isPending ? "…" : "Request withdrawal"}
-                </button>
-              )}
+          <div className="mt-3 flex items-center gap-2 rounded-2xl border border-border bg-background p-1 pl-3 focus-within:border-primary">
+            <input
+              value={wdInput}
+              onChange={(e) => setWdInput(e.target.value.replace(/[^0-9]/g, ""))}
+              inputMode="numeric"
+              placeholder={`${w.minTokens}`}
+              className="w-full bg-transparent py-2.5 text-sm outline-none"
+            />
+            <button
+              onClick={() => setWdInput(String(Math.min(w.balance, w.maxTokens)))}
+              className="shrink-0 rounded-xl bg-secondary px-3 py-2 text-xs font-bold text-secondary-foreground"
+            >
+              MAX
+            </button>
+          </div>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            {w.minTokens.toLocaleString()} – {w.maxTokens.toLocaleString()} FOX · fee ${w.feeFlat} + {w.feePercent}%
+          </p>
+          <div className="mt-3 space-y-1 rounded-2xl bg-muted p-3 text-xs">
+            <div className="flex justify-between"><span>Amount</span><span>${gross.toFixed(4)}</span></div>
+            <div className="flex justify-between"><span>Fee</span><span>-${Math.min(fee, gross).toFixed(4)}</span></div>
+            <div className="flex justify-between text-sm font-black">
+              <span>You receive</span>
+              <span className="flex items-center gap-1 text-primary"><UsdtLogo className="h-4 w-4" />${net.toFixed(4)}</span>
             </div>
+          </div>
 
-            <SectionTitle>History</SectionTitle>
-            {w.history.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No withdrawals yet.</p>
-            ) : (
-              <ul className="space-y-2">
-                {w.history.map((h) => (
-                  <li
-                    key={h.id}
-                    className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3 text-sm"
-                  >
-                    <span className="text-lg">
-                      {h.status === "paid" ? "✅" : h.status === "rejected" ? "❌" : "⏳"}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold">
-                        {h.tokens.toLocaleString()} FOX · ${h.net.toFixed(4)}
-                      </p>
-                      <p className="text-[11px] text-muted-foreground">
-                        {new Date(h.at).toLocaleString()}
-                        {h.txid ? " · paid" : ""}
-                      </p>
-                    </div>
-                    {h.txid ? (
-                      <button
-                        onClick={() => openLink(`https://bscscan.com/tx/${h.txid}`)}
-                        className="text-xs font-bold text-primary"
-                      >
-                        View
-                      </button>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">{h.status}</span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </>
-        )}
+          {w.hasPending ? (
+            <p className="mt-3 rounded-2xl bg-muted p-3 text-center text-xs font-semibold">
+              ⏳ You already have a pending withdrawal.
+            </p>
+          ) : (
+            <button
+              disabled={!canSend || wdMut.isPending}
+              onClick={() =>
+                wdMut.mutate(tokens, {
+                  onSuccess: (r) => {
+                    setWdInput("");
+                    toast.success(`💸 Request sent · $${r.net.toFixed(4)}`);
+                  },
+                  onError: (e) => toast.error(friendlyError(e)),
+                })
+              }
+              className="mt-3 w-full rounded-2xl bg-primary p-3.5 text-sm font-extrabold text-primary-foreground disabled:opacity-50"
+            >
+              {wdMut.isPending ? "…" : "Request withdrawal"}
+            </button>
+          )}
+        </div>
+        <WithdrawHistory items={w.history} />
       </div>
     );
   }
@@ -331,8 +374,10 @@ export function ProfileTab() {
         ) : (
           <ul className="space-y-2">
             {data.referrals.list.map((r) => (
-              <li key={r.id} className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3 text-sm">
-                <span className="text-lg">{r.fake ? "⚠️" : r.status === "paid" ? "✅" : "⏳"}</span>
+              <li key={r.id} className={`flex items-center gap-3 rounded-2xl border bg-card p-3 text-sm ${r.fake ? "border-destructive/40" : "border-border"}`}>
+                <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-full text-sm font-black ${r.fake ? "bg-destructive/15 text-destructive" : "bg-primary/15 text-primary"}`}>
+                  {r.fake ? "!" : (r.name || "?").slice(0, 1).toUpperCase()}
+                </span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-semibold">{r.name}</p>
                   <p className="text-[11px] text-muted-foreground">
@@ -473,7 +518,7 @@ export function ProfileTab() {
 
       <SectionTitle>{t(lang, "finance")}</SectionTitle>
       <Row icon={Wallet} label={t(lang, "wallet")} onClick={() => setScreen("wallet")} trailing={u.walletAddress ? "✓" : undefined} />
-      <Row icon={Banknote} label="Withdraw USDT" onClick={() => setScreen("withdraw")} />
+      <Row icon={Banknote} label="Withdraw USDT" onClick={() => { setWdStep("req"); setScreen("withdraw"); }} />
       <Row icon={ArrowLeftRight} label={t(lang, "transactions")} onClick={() => setScreen("transactions")} />
 
       <SectionTitle>{t(lang, "social")}</SectionTitle>
@@ -501,5 +546,62 @@ export function ProfileTab() {
         </>
       ) : null}
     </div>
+  );
+}
+
+function UsdtLogo({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 32 32" className={className} aria-label="USDT">
+      <circle cx="16" cy="16" r="16" fill="#26A17B" />
+      <path
+        fill="#fff"
+        d="M17.9 17.4v0c-.1 0-.7.1-1.9.1-1 0-1.7 0-1.9-.1v0c-3.7-.2-6.5-.8-6.5-1.6s2.8-1.4 6.5-1.6v2.5c.2 0 .9.1 1.9.1 1.2 0 1.8-.1 1.9-.1v-2.5c3.7.2 6.4.8 6.4 1.6s-2.7 1.4-6.4 1.6m0-3.4V11.8h5.2V8.3H8.9v3.5h5.2V14c-4.2.2-7.4 1-7.4 2s3.2 1.8 7.4 2v7h3.8v-7c4.2-.2 7.4-1 7.4-2s-3.2-1.8-7.4-2"
+      />
+    </svg>
+  );
+}
+
+function WithdrawHistory({
+  items,
+}: {
+  items: { id: string; tokens: number; net: number; status: string; txid: string | null; at: string }[];
+}) {
+  return (
+    <>
+      <SectionTitle>📜 Withdrawal history</SectionTitle>
+      {items.length === 0 ? (
+        <p className="rounded-2xl border border-dashed border-border p-4 text-center text-sm text-muted-foreground">No withdrawals yet.</p>
+      ) : (
+        <ul className="space-y-2">
+          {items.map((h) => {
+            const tone =
+              h.status === "paid"
+                ? "bg-primary/15 text-primary"
+                : h.status === "rejected"
+                  ? "bg-destructive/15 text-destructive"
+                  : "bg-muted text-muted-foreground";
+            return (
+              <li key={h.id} className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3 text-sm">
+                <UsdtLogo className="h-9 w-9 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="font-black">${h.net.toFixed(4)} USDT</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {h.tokens.toLocaleString()} FOX · {new Date(h.at).toLocaleDateString()}
+                  </p>
+                </div>
+                <div className="flex flex-col items-end gap-1">
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${tone}`}>{h.status}</span>
+                  {h.txid ? (
+                    <button onClick={() => openLink(`https://bscscan.com/tx/${h.txid}`)} className="text-[11px] font-bold text-primary">
+                      View tx ↗
+                    </button>
+                  ) : null}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </>
   );
 }
