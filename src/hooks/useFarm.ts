@@ -14,6 +14,7 @@ import {
   setWallet,
   getWithdrawState,
   createWithdrawal,
+  verifyWithdrawUser,
   getTasks,
   claimTask,
   claimReferralRewards,
@@ -186,5 +187,14 @@ export function useClaimTask() {
       qc.invalidateQueries({ queryKey: TASKS_KEY });
       qc.invalidateQueries({ queryKey: HOME_KEY });
     },
+  });
+}
+
+export function useVerifyWithdraw() {
+  const qc = useQueryClient();
+  const fn = useServerFn(verifyWithdrawUser);
+  return useMutation({
+    mutationFn: () => fn({ data: { initData: getInitData() } }),
+    onSettled: () => qc.invalidateQueries({ queryKey: WITHDRAW_KEY }),
   });
 }

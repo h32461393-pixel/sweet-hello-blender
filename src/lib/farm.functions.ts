@@ -30,8 +30,11 @@ function rpcMessage(error: unknown, fallback: string): string {
     "Amount is too small after fees",
     "Please reopen the app",
     "already used by another account",
+    "Complete all withdrawal requirements first",
+    "Please verify your activity first",
+    "Withdrawals are paused right now",
   ];
-  const min = msg.match(/Minimum withdrawal is [\d,.]+ FOX/);
+  const min = msg.match(/(Minimum|Maximum) withdrawal is [\d,.]+ FOX/);
   if (min) return min[0];
   const hit = known.find((k) => msg.includes(k));
   if (hit) return hit;
@@ -39,7 +42,7 @@ function rpcMessage(error: unknown, fallback: string): string {
 }
 
 
-import { MINI_APP_URL, COMMUNITY_URL, PAYMENT_URL, ADMIN_TELEGRAM_ID, BANNER_URL, SITE_URL } from "./constants";
+import { MINI_APP_URL, COMMUNITY_URL, PAYMENT_URL, ADMIN_TELEGRAM_ID, BANNER_URL, SITE_URL, REQUIRED_CHANNELS } from "./constants";
 
 type Ctx = Awaited<ReturnType<typeof loadCtx>>;
 
@@ -800,7 +803,7 @@ export const getPayoutProof = createServerFn({ method: "GET" }).handler(async ()
 /** Withdrawal settings, merged with admin-editable config. */
 const DEFAULT_WITHDRAW = {
   firstMin: 10000,
-  nextMin: 20000,
+  nextMin: 10000,
   feeFlat: 0.01,
   feePercent: 5,
   tokensPerUsd: 100000,
@@ -872,7 +875,7 @@ async function withdrawRequirements(ctx: Ctx, userId: string, cfg: WdCfg) {
 
 function tokenLimits(cfg: WdCfg, withdrawalCount: number) {
   const base = withdrawalCount > 0 ? cfg.nextMin : cfg.firstMin;
-  const minTokens = Math.max(Math.ceil(cfg.minUsd * cfg.tokensPerUsd), Math.min(base, Math.ceil(cfg.minUsd * cfg.tokensPerUsd)));
+  const minTokens = Math.max(base, Math.ceil(cfg.minUsd * cfg.tokensPerUsd));
   const maxTokens = Math.floor(cfg.maxUsd * cfg.tokensPerUsd);
   return { minTokens, maxTokens };
 }
@@ -999,12 +1002,20 @@ export const createWithdrawal = createServerFn({ method: "POST" })
     await rateLimit(ctx.db, "wd_create", ctx.tg.id, 5, 3600);
     const u = await getUserRow(ctx);
     const cfg = await withdrawConfig(ctx.db);
+    const app = await appSettings(ctx.db);
+    if (!app.withdrawalsEnabled) throw new Error("Withdrawals are paused right now");
+    const req = await withdrawRequirements(ctx, u.id, cfg);
+    if (!req.allDone) throw new Error("Complete all withdrawal requirements first");
+    if (!req.verifiedToday) throw new Error("Please verify your activity first");
+    const lim = tokenLimits(cfg, Number((u as Record<string, unknown>)["withdrawal_count"] ?? 0));
+    if (data.tokens < lim.minTokens) throw new Error(`Minimum withdrawal is ${lim.minTokens.toLocaleString()} FOX`);
+    if (data.tokens > lim.maxTokens) throw new Error(`Maximum withdrawal is ${lim.maxTokens.toLocaleString()} FOX`);
 
     const res = await ctx.db.rpc("create_withdrawal_v1", {
       _user_id: u.id,
       _tokens: data.tokens,
-      _first_min: cfg.firstMin,
-      _next_min: cfg.nextMin,
+      _first_min: lim.minTokens,
+      _next_min: lim.minTokens,
       _fee_flat: cfg.feeFlat,
       _fee_percent: cfg.feePercent,
       _tokens_per_usd: cfg.tokensPerUsd,
@@ -1125,4 +1136,17 @@ export const claimTask = createServerFn({ method: "POST" })
       _key: `${key}:${u.id}`,
     });
     return { reward, balance: Number(balance ?? 0) };
+  });
+
+/** Checks every required channel on each app open. Returns the ones not joined yet. */
+export const checkRequiredChannels = createServerFn({ method: "POST" })
+  .inputValidator(vInit)
+  .handler(async ({ data }) => {
+    const ctx = await loadCtx(data.initData);
+    await rateLimit(ctx.db, "channels", ctx.tg.id, 40, 300);
+    const { isChatMember } = await import("./telegram.server");
+    const results = await Promise.all(
+      REQUIRED_CHANNELS.map(async (c) => ({ ...c, joined: await isChatMember(c.chat, ctx.tg.id) })),
+    );
+    return { missing: results.filter((r) => !r.joined).map(({ title, url }) => ({ title, url })) };
   });
