@@ -23,6 +23,10 @@ import {
   adminUserActivity,
   adminAudit,
   adminBroadcast,
+  adminListPartners,
+  adminSavePartners,
+  adminCheckBotAdmin,
+  adminPostPartner,
 } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/admin")({
@@ -43,7 +47,7 @@ export const Route = createFileRoute("/admin")({
 type Creds = { initData: string; username: string; password: string };
 const SESSION_KEY = "foxfarm.admin";
 
-const TABS = ["Overview", "Users", "Payouts", "Tasks", "Ads", "Sites", "Codes", "Notify", "Log"] as const;
+const TABS = ["Overview", "Users", "Suspended", "Payouts", "Tasks", "Ads", "Sites", "Codes", "Notify", "Partners", "Settings", "Log"] as const;
 
 type SiteRow = { id: string; title: string; url: string; reward: number; icon: string };
 
@@ -217,7 +221,10 @@ function Panel({ creds, onLogout }: { creds: Creds; onLogout: () => void }) {
       </div>
 
       {tab === "Overview" && <Overview creds={creds} />}
-      {tab === "Users" && <Users creds={creds} />}
+      {tab === "Users" && <Users creds={creds} status="active" />}
+      {tab === "Suspended" && <Users creds={creds} status="suspended" />}
+      {tab === "Partners" && <Partners creds={creds} />}
+      {tab === "Settings" && <Settings creds={creds} />}
       {tab === "Payouts" && <Payouts creds={creds} />}
       {tab === "Tasks" && <Tasks creds={creds} />}
       {tab === "Ads" && <Ads creds={creds} />}
@@ -231,8 +238,10 @@ function Panel({ creds, onLogout }: { creds: Creds; onLogout: () => void }) {
 
 function Overview({ creds }: { creds: Creds }) {
   const fn = useServerFn(adminOverview);
-  const { data } = useQuery({ queryKey: ["admin-overview"], queryFn: () => fn({ data: creds }) });
+  const { data } = useQuery({ queryKey: ["admin-overview"], queryFn: () => fn({ data: creds }), refetchInterval: 30_000 });
   const items = [
+    ["🟢 Online now", data?.online ?? 0],
+    ["📅 Active 24h", data?.active24h ?? 0],
     ["👥 Users", data?.users ?? 0],
     ["🆕 New today", data?.newToday ?? 0],
     ["🚫 Suspended", data?.suspended ?? 0],
@@ -253,7 +262,7 @@ function Overview({ creds }: { creds: Creds }) {
   );
 }
 
-function Users({ creds }: { creds: Creds }) {
+function Users({ creds, status }: { creds: Creds; status: "active" | "suspended" }) {
   const [q, setQ] = useState("");
   const [amount, setAmount] = useState<Record<string, string>>({});
   const [open, setOpen] = useState<string | null>(null);
@@ -262,8 +271,8 @@ function Users({ creds }: { creds: Creds }) {
   const suspendFn = useServerFn(adminSetSuspended);
   const qc = useQueryClient();
   const { data } = useQuery({
-    queryKey: ["admin-users", q],
-    queryFn: () => search({ data: { ...creds, q } }),
+    queryKey: ["admin-users", status, q],
+    queryFn: () => search({ data: { ...creds, q, status } }),
   });
   const refresh = () => qc.invalidateQueries({ queryKey: ["admin-users"] });
 
@@ -293,6 +302,9 @@ function Users({ creds }: { creds: Creds }) {
                 {u.firstName ?? "User"} {u.username ? `(@${u.username})` : ""}
               </p>
               <p className="text-xs text-muted-foreground">🆔 {u.telegramId}</p>
+              {u.suspended && (u as { suspendReason?: string | null }).suspendReason ? (
+                <p className="text-xs text-destructive">🚫 {(u as { suspendReason?: string | null }).suspendReason}</p>
+              ) : null}
               <p className="text-xs">🪙 {u.balance.toLocaleString()} FOX · earned {u.totalEarned.toLocaleString()}</p>
               {u.wallet ? <p className="truncate text-[10px] text-muted-foreground">{u.wallet}</p> : null}
               <button onClick={() => setOpen(open === u.id ? null : u.id)} className="mt-1 text-xs font-bold text-primary">
@@ -659,29 +671,197 @@ function Activity({ creds, userId }: { creds: Creds; userId: string }) {
 
 function Notify({ creds }: { creds: Creds }) {
   const [text, setText] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
+  const [buttonText, setButtonText] = useState("");
+  const [buttonUrl, setButtonUrl] = useState("");
+  const [toUsers, setToUsers] = useState(true);
+  const [toChannel, setToChannel] = useState(false);
   const fn = useServerFn(adminBroadcast);
   const send = useMutation({
-    mutationFn: () => fn({ data: { ...creds, text } }),
-    onSuccess: (r) => { toast.success(`Sent to ${r.sent} users`); setText(""); },
+    mutationFn: () => fn({ data: { ...creds, text, imageUrl, buttonText, buttonUrl, toUsers, toChannel } }),
+    onSuccess: (r) => {
+      toast.success(`Sent to ${r.sent} users${toChannel ? (r.channel ? " + channel" : " (channel failed)") : ""}`);
+      setText("");
+    },
     onError: (e) => toast.error((e as Error).message),
   });
   return (
     <Card>
+      <p className="mb-2 text-sm font-black">📣 Broadcast</p>
+      <p className="mb-2 text-[11px] text-muted-foreground">HTML supported: &lt;b&gt;, &lt;i&gt;, &lt;a href=""&gt;, &lt;code&gt;</p>
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
         rows={6}
-        placeholder="🎉 Big news for all farmers…"
+        placeholder="🎉 <b>Big news</b> for all farmers…"
         className="w-full rounded-xl border border-border bg-background p-2 text-sm"
       />
+      <div className="mt-2 space-y-2">
+        <Field label="Image link (optional)" value={imageUrl} onChange={setImageUrl} placeholder="https://i.ibb.co/…" />
+        <Field label="Button text (optional)" value={buttonText} onChange={setButtonText} placeholder="Join now" />
+        <Field label="Button link (optional)" value={buttonUrl} onChange={setButtonUrl} placeholder="https://…" />
+        <label className="flex items-center gap-2 text-xs font-bold"><input type="checkbox" checked={toUsers} onChange={(e) => setToUsers(e.target.checked)} /> All users</label>
+        <label className="flex items-center gap-2 text-xs font-bold"><input type="checkbox" checked={toChannel} onChange={(e) => setToChannel(e.target.checked)} /> Community channel</label>
+      </div>
       <button
         onClick={() => send.mutate()}
-        disabled={send.isPending}
+        disabled={send.isPending || (!toUsers && !toChannel)}
         className="mt-2 w-full rounded-xl bg-primary py-2 text-sm font-black text-primary-foreground disabled:opacity-50"
       >
-        {send.isPending ? "Sending…" : "📣 Send to everyone"}
+        {send.isPending ? "Sending…" : "📣 Send"}
       </button>
     </Card>
+  );
+}
+
+type PartnerRow = { id: string; title: string; chat: string; referLink: string };
+
+function Partners({ creds }: { creds: Creds }) {
+  const listFn = useServerFn(adminListPartners);
+  const saveFn = useServerFn(adminSavePartners);
+  const checkFn = useServerFn(adminCheckBotAdmin);
+  const postFn = useServerFn(adminPostPartner);
+  const qc = useQueryClient();
+  const { data } = useQuery({ queryKey: ["admin-partners"], queryFn: () => listFn({ data: creds }) });
+  const items = (data?.partners ?? []) as PartnerRow[];
+  const [title, setTitle] = useState("");
+  const [chat, setChat] = useState("");
+  const [link, setLink] = useState("");
+  const [html, setHtml] = useState("🦊 <b>Fox Farm</b> — mine FOX every hour and withdraw USDT!");
+  const [imageUrl, setImageUrl] = useState("");
+  const [buttonText, setButtonText] = useState("🦊 Start earning");
+  const save = useMutation({
+    mutationFn: (next: PartnerRow[]) => saveFn({ data: { ...creds, partners: next } }),
+    onSuccess: () => { toast.success("Partners saved"); qc.invalidateQueries({ queryKey: ["admin-partners"] }); },
+    onError: (e) => toast.error((e as Error).message),
+  });
+  const check = useMutation({
+    mutationFn: (c: string) => checkFn({ data: { ...creds, chat: c } }),
+    onSuccess: (r) => (r.canPost ? toast.success("✅ Bot is admin and can post") : toast.error(`Bot is not admin (${r.status})`)),
+    onError: (e) => toast.error((e as Error).message),
+  });
+  const post = useMutation({
+    mutationFn: (p: PartnerRow) =>
+      postFn({ data: { ...creds, chat: p.chat, html, imageUrl, buttonText, referLink: p.referLink || data?.defaultLink || "" } }),
+    onSuccess: () => toast.success("Posted"),
+    onError: (e) => toast.error((e as Error).message),
+  });
+  return (
+    <div className="space-y-3">
+      <Card>
+        <p className="mb-2 text-sm font-black">🤝 Add partner channel</p>
+        <div className="space-y-2">
+          <Field label="Title" value={title} onChange={setTitle} placeholder="Earning Hub" />
+          <Field label="Channel (@name or id)" value={chat} onChange={setChat} placeholder="@EarningHub1236" />
+          <Field label="Refer link (optional — default is yours)" value={link} onChange={setLink} placeholder={data?.defaultLink ?? ""} />
+          <button
+            onClick={() => {
+              if (!chat.trim()) { toast.error("Enter the channel"); return; }
+              save.mutate([...items, { id: `p${Date.now().toString(36)}`, title: title.trim(), chat: chat.trim(), referLink: link.trim() }]);
+              setTitle(""); setChat(""); setLink("");
+            }}
+            className="w-full rounded-xl bg-primary py-2 text-sm font-black text-primary-foreground"
+          >
+            Add channel
+          </button>
+        </div>
+      </Card>
+      <Card>
+        <p className="mb-2 text-sm font-black">✉️ Post content (HTML)</p>
+        <textarea value={html} onChange={(e) => setHtml(e.target.value)} rows={5} className="w-full rounded-xl border border-border bg-background p-2 text-sm" />
+        <div className="mt-2 space-y-2">
+          <Field label="Image link (optional)" value={imageUrl} onChange={setImageUrl} placeholder="https://i.ibb.co/…" />
+          <Field label="Button text" value={buttonText} onChange={setButtonText} />
+        </div>
+      </Card>
+      {items.map((p) => (
+        <Card key={p.id}>
+          <p className="truncate text-sm font-black">{p.title}</p>
+          <p className="truncate text-[11px] text-muted-foreground">{p.chat} · {p.referLink || "default refer link"}</p>
+          <div className="mt-2 grid grid-cols-4 gap-1">
+            <button onClick={() => check.mutate(p.chat)} className="rounded-lg bg-secondary py-1 text-[11px] font-bold">Check</button>
+            <button onClick={() => post.mutate(p)} disabled={post.isPending} className="rounded-lg bg-primary py-1 text-[11px] font-bold text-primary-foreground disabled:opacity-50">Post</button>
+            <button
+              onClick={() => {
+                const l = window.prompt("Refer link", p.referLink || data?.defaultLink || "");
+                if (l !== null) save.mutate(items.map((x) => (x.id === p.id ? { ...x, referLink: l.trim() } : x)));
+              }}
+              className="rounded-lg bg-secondary py-1 text-[11px] font-bold"
+            >
+              Link
+            </button>
+            <button onClick={() => save.mutate(items.filter((x) => x.id !== p.id))} className="rounded-lg bg-destructive py-1 text-[11px] font-bold text-destructive-foreground">Delete</button>
+          </div>
+        </Card>
+      ))}
+      {!items.length && <p className="text-center text-xs text-muted-foreground">No partner channels yet.</p>}
+    </div>
+  );
+}
+
+function Settings({ creds }: { creds: Creds }) {
+  const getFn = useServerFn(adminGetConfig);
+  const setFn = useServerFn(adminSetConfig);
+  const qc = useQueryClient();
+  const app = useQuery({ queryKey: ["admin-cfg-app"], queryFn: () => getFn({ data: { ...creds, key: "app" } }) });
+  const wd = useQuery({ queryKey: ["admin-cfg-wd"], queryFn: () => getFn({ data: { ...creds, key: "withdraw" } }) });
+  const parse = (j?: string) => { try { return JSON.parse(j ?? "{}") as Record<string, unknown>; } catch { return {}; } };
+  const a = parse(app.data?.json);
+  const w = parse(wd.data?.json);
+  const [aD, setAD] = useState<Record<string, unknown> | null>(null);
+  const [wD, setWD] = useState<Record<string, unknown> | null>(null);
+  const av = aD ?? a;
+  const wv = wD ?? w;
+  const save = useMutation({
+    mutationFn: async () => {
+      await setFn({ data: { ...creds, key: "app", value: av } });
+      const nums: Record<string, number> = {};
+      for (const [k, v] of Object.entries(wv)) if (v !== "" && Number.isFinite(Number(v))) nums[k] = Number(v);
+      await setFn({ data: { ...creds, key: "withdraw", value: nums } });
+    },
+    onSuccess: () => { toast.success("Settings saved — live in the app"); setAD(null); setWD(null); qc.invalidateQueries({ queryKey: ["admin-cfg-app"] }); qc.invalidateQueries({ queryKey: ["admin-cfg-wd"] }); },
+    onError: (e) => toast.error((e as Error).message),
+  });
+  const bool = (k: string, def: boolean) => (av[k] === undefined ? def : av[k] === true || av[k] === "true");
+  const Toggle = ({ k, label, def }: { k: string; label: string; def: boolean }) => (
+    <label className="flex items-center justify-between rounded-xl border border-border p-2 text-sm font-bold">
+      {label}
+      <input type="checkbox" checked={bool(k, def)} onChange={(e) => setAD({ ...av, [k]: e.target.checked })} />
+    </label>
+  );
+  const num = (k: string, label: string, def: number) => (
+    <Field key={k} label={label} type="number" value={String(wv[k] ?? def)} onChange={(v) => setWD({ ...wv, [k]: v })} />
+  );
+  return (
+    <div className="space-y-3">
+      <Card>
+        <p className="mb-2 text-sm font-black">⚙️ App</p>
+        <div className="space-y-2">
+          <Toggle k="maintenance" label="🛠 Maintenance mode (you stay exempt)" def={false} />
+          <Toggle k="withdrawals_enabled" label="💸 Withdrawals enabled" def={true} />
+          <Field label="Maintenance message" value={String(av["maintenance_text"] ?? "")} onChange={(v) => setAD({ ...av, maintenance_text: v })} />
+          <Field label="Notice banner (empty = hidden)" value={String(av["notice"] ?? "")} onChange={(v) => setAD({ ...av, notice: v })} />
+        </div>
+      </Card>
+      <Card>
+        <p className="mb-2 text-sm font-black">💵 Withdrawal rules</p>
+        <div className="grid grid-cols-2 gap-2">
+          {num("min_usd", "Min USD", 0.05)}
+          {num("max_usd", "Max USD", 0.5)}
+          {num("first_min", "1st min FOX", 10000)}
+          {num("next_min", "Next min FOX", 10000)}
+          {num("fee_flat", "Fee flat $", 0)}
+          {num("fee_percent", "Fee %", 0)}
+          {num("tokens_per_usd", "FOX per $1", 100000)}
+          {num("req_daily_ads", "Daily ads needed", 30)}
+          {num("req_referrals", "Referrals needed", 2)}
+          {num("req_daily_tasks", "Daily tasks needed", 2)}
+        </div>
+      </Card>
+      <button onClick={() => save.mutate()} disabled={save.isPending} className="w-full rounded-xl bg-primary py-3 text-sm font-black text-primary-foreground disabled:opacity-50">
+        {save.isPending ? "Saving…" : "Save settings"}
+      </button>
+    </div>
   );
 }
 

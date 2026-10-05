@@ -52,8 +52,9 @@
 - [x] Re-enable ads: Adsgram reward 51743 / int-51744, Monetag, GigaPub, Monetix; no reward when no ad, "Try again"
 - [x] Ads tab: per-network total tokens/$ summary, daily reset countdown, 5s cooldown on all buttons after an ad, reward popup
 - [x] Ads on mining start/claim, reward code, referral claim (random); Adsgram int on app open and every Home visit
-- [ ] Withdraw flow: requirements (30 daily ads, 2 referrals, 2 daily tasks, min $0.05 / max $0.5, admin-editable) → 2 Adsgram ads → verify activity → open or auto-suspend fake
+- [x] Withdraw flow: requirements (30 daily ads, 2 referrals, 2 daily tasks, min $0.05 / max $0.5, admin-editable) → 2 Adsgram ads → verify activity → open or auto-suspend fake
 - [x] Fix Visit sites "could not verify" (reward not added)
-- [ ] Admin Settings tab: all values, withdrawals on/off, maintenance mode (admin exempt), changes reflected live in app
-- [ ] Admin Users split Active / Suspended; better Overview with online users
-- [ ] Broadcast to all users + community channel, HTML, buttons, links, image
+- [x] Admin Settings tab: all values, withdrawals on/off, maintenance mode (admin exempt), changes reflected live in app
+- [x] Admin Users split Active / Suspended; better Overview with online users
+- [x] Broadcast to all users + community channel, HTML, buttons, links, image
+- [x] Partner channels admin: add, bot-admin check, post (HTML+image, refer button), link edit, delete

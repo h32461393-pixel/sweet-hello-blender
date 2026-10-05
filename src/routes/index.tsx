@@ -11,7 +11,8 @@ import { TasksTab } from "@/components/tabs/TasksTab";
 import { AdsTab } from "@/components/tabs/AdsTab";
 import { ReferTab } from "@/components/tabs/ReferTab";
 import { ProfileTab } from "@/components/tabs/ProfileTab";
-import { syncUser } from "@/lib/farm.functions";
+import { syncUser, getAppStatus } from "@/lib/farm.functions";
+import { useQuery } from "@tanstack/react-query";
 import { ChannelGate } from "@/components/ChannelGate";
 import { getInitData, getWebApp } from "@/lib/telegram-client";
 import { MINI_APP_URL, BOT_USERNAME, assetUrl } from "@/lib/constants";
@@ -77,6 +78,7 @@ function Index() {
 
   return (
     <ChannelGate>
+      <MaintenanceGate>
       <HomeInterstitial tab={tab} />
       <AppShell tab={tab} onTab={setTab}>
         {tab === "home" && <HomeTab onTab={setTab} />}
@@ -87,9 +89,37 @@ function Index() {
       </AppShell>
       <AdOverlay />
       <Toaster position="top-center" />
+      </MaintenanceGate>
     </ChannelGate>
   );
 
+}
+
+/** Maintenance screen (admin exempt) and optional notice banner, both set from the admin Settings tab. */
+function MaintenanceGate({ children }: { children: React.ReactNode }) {
+  const fn = useServerFn(getAppStatus);
+  const q = useQuery({
+    queryKey: ["app-status"],
+    queryFn: () => fn({ data: { initData: getInitData() } }),
+    refetchInterval: 60_000,
+    retry: 1,
+  });
+  if (q.data?.maintenance)
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background p-8 text-center">
+        <div className="text-6xl">🛠️</div>
+        <h1 className="text-2xl font-bold text-foreground">Under maintenance</h1>
+        <p className="max-w-sm text-muted-foreground">{q.data.maintenanceText}</p>
+      </main>
+    );
+  return (
+    <>
+      {q.data?.notice ? (
+        <div className="mx-auto max-w-md bg-accent/20 px-4 py-2 text-center text-xs font-bold text-foreground">📢 {q.data.notice}</div>
+      ) : null}
+      {children}
+    </>
+  );
 }
 
 /** Adsgram interstitial on app open and every time the user returns to Home. */

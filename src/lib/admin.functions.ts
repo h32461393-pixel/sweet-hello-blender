@@ -57,6 +57,14 @@ export const adminOverview = createServerFn({ method: "POST" })
       db.from("withdrawals").select("net_usd").eq("status", "paid"),
       db.from("ad_views").select("id", { count: "exact", head: true }).eq("day", today),
     ]);
+    const online = await db
+      .from("app_users")
+      .select("id", { count: "exact", head: true })
+      .gte("last_seen_at", new Date(Date.now() - 5 * 60_000).toISOString());
+    const active24 = await db
+      .from("app_users")
+      .select("id", { count: "exact", head: true })
+      .gte("last_seen_at", new Date(Date.now() - 86_400_000).toISOString());
 
     const sum = (rows: { net_usd: number }[] | null) =>
       (rows ?? []).reduce((a, r) => a + Number(r.net_usd ?? 0), 0);
@@ -69,6 +77,8 @@ export const adminOverview = createServerFn({ method: "POST" })
       pendingUsd: sum(pending.data as never),
       paidUsd: sum(paid.data as never),
       adViewsToday: adsToday.count ?? 0,
+      online: online.count ?? 0,
+      active24h: active24.count ?? 0,
     };
   });
 
@@ -432,33 +442,51 @@ export const adminAudit = createServerFn({ method: "POST" })
 
 /** Broadcast an announcement to every user through the bot. */
 export const adminBroadcast = createServerFn({ method: "POST" })
-  .inputValidator((d: Auth & { text: string }) => {
-    vAuth(d);
-    const text = String(d.text ?? "").trim().slice(0, 900);
-    if (text.length < 3) throw new Error("Message is too short");
-    return { ...d, text };
-  })
+  .inputValidator(
+    (d: Auth & { text: string; imageUrl?: string; buttonText?: string; buttonUrl?: string; toUsers?: boolean; toChannel?: boolean }) => {
+      vAuth(d);
+      const text = String(d.text ?? "").trim().slice(0, 1000);
+      if (text.length < 3) throw new Error("Message is too short");
+      const imageUrl = String(d.imageUrl ?? "").trim().slice(0, 500);
+      if (imageUrl && !/^https:\/\//i.test(imageUrl)) throw new Error("Image link must start with https://");
+      const buttonUrl = String(d.buttonUrl ?? "").trim().slice(0, 300);
+      if (buttonUrl && !/^https:\/\//i.test(buttonUrl)) throw new Error("Button link must start with https://");
+      return {
+        ...d,
+        text,
+        imageUrl,
+        buttonUrl,
+        buttonText: String(d.buttonText ?? "").trim().slice(0, 40),
+        toUsers: d.toUsers !== false,
+        toChannel: d.toChannel === true,
+      };
+    },
+  )
   .handler(async ({ data }) => {
     const ctx = await adminCtx(data);
-    const { sendMessage } = await import("./telegram.server");
-    const { data: rows } = await ctx.db
-      .from("app_users")
-      .select("telegram_id")
-      .eq("suspended", false)
-      .limit(3000);
+    await rateLimit(ctx.db, "admin_broadcast", ctx.adminId, 5, 3600);
+    const { sendMessage, sendPhoto } = await import("./telegram.server");
+    const buttons: { text: string; url: string }[][] = [];
+    if (data.buttonUrl) buttons.push([{ text: data.buttonText || "🔗 Open", url: data.buttonUrl }]);
+    buttons.push([{ text: "🦊 Open Mini App", url: MINI_APP_URL }]);
+    const send = (chat: number | string) =>
+      data.imageUrl ? sendPhoto(chat, data.imageUrl, data.text, buttons) : sendMessage(chat, data.text, buttons);
     let sent = 0;
-    for (const r of rows ?? []) {
-      try {
-        await sendMessage(Number(r.telegram_id), `📣 <b>Fox Farm</b>\n\n${data.text}`, [
-          [{ text: "🦊 Open Mini App", url: MINI_APP_URL }],
-        ]);
-        sent += 1;
-      } catch {
-        /* skip blocked users */
+    let channel = false;
+    if (data.toChannel) channel = Boolean(await send("@foxfarm_community").catch(() => null));
+    if (data.toUsers) {
+      const { data: rows } = await ctx.db.from("app_users").select("telegram_id").eq("suspended", false).limit(3000);
+      for (const r of rows ?? []) {
+        try {
+          if (await send(Number(r.telegram_id))) sent += 1;
+        } catch {
+          /* blocked */
+        }
+        await new Promise((res) => setTimeout(res, 40));
       }
     }
-    await audit(ctx, "broadcast", null, { sent });
-    return { sent };
+    await audit(ctx, "broadcast", null, { sent, channel, image: Boolean(data.imageUrl) });
+    return { sent, channel };
   });
 
 export const adminListCodes = createServerFn({ method: "POST" })
