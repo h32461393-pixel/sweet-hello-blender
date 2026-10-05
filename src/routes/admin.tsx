@@ -848,7 +848,7 @@ function Settings({ creds }: { creds: Creds }) {
         <div className="grid grid-cols-2 gap-2">
           {num("min_usd", "Min USD", 0.05)}
           {num("max_usd", "Max USD", 0.5)}
-          {num("first_min", "1st min FOX", 0)}
+          {num("first_min", "1st min FOX", 10000)}
           {num("next_min", "Next min FOX", 10000)}
           {num("fee_flat", "Fee flat $", 0)}
           {num("fee_percent", "Fee %", 0)}
