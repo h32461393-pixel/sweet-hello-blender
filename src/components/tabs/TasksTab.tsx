@@ -1,20 +1,20 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import { GuideCard } from "@/components/AppShell";
-import { COMMUNITY_URL, PAYMENT_URL } from "@/lib/constants";
 import { openLink } from "@/lib/telegram-client";
-import {
-  useClaimChannelTask,
-  useClaimTask,
-  useHomeState,
-  useTasks,
-  friendlyError,
-} from "@/hooks/useFarm";
+import { assetUrl } from "@/lib/constants";
+import logo from "@/assets/fox-logo.png.asset.json";
+import { useClaimTask, useTasks, friendlyError } from "@/hooks/useFarm";
 
-type Section = "daily" | "main" | "partner";
+type Section = "main" | "partner" | "bot" | "miniapp";
+
+const SECTIONS: { id: Section; label: string }[] = [
+  { id: "main", label: "⭐ Main" },
+  { id: "partner", label: "🤝 Partner" },
+  { id: "bot", label: "🤖 Bots" },
+  { id: "miniapp", label: "📱 Mini Apps" },
+];
 
 function TaskRow({
-  icon,
   iconUrl,
   title,
   subtitle,
@@ -23,7 +23,6 @@ function TaskRow({
   pending,
   onGo,
 }: {
-  icon: string;
   iconUrl?: string | null;
   title: string;
   subtitle: string;
@@ -33,17 +32,9 @@ function TaskRow({
   onGo?: () => void;
 }) {
   return (
-    <div
-      className={`flex items-center gap-3 rounded-2xl border border-border bg-card p-3 ${
-        done ? "opacity-60" : ""
-      }`}
-    >
-      <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-secondary text-lg">
-        {iconUrl ? (
-          <img src={iconUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
-        ) : (
-          <span>{done ? "✅" : icon}</span>
-        )}
+    <div className={`flex items-center gap-3 rounded-2xl border border-border bg-card p-3 ${done ? "opacity-60" : ""}`}>
+      <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-secondary">
+        <img src={iconUrl || assetUrl(logo.url)} alt="" className="h-full w-full object-cover" loading="lazy" />
       </div>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-bold">{title}</p>
@@ -65,65 +56,17 @@ function TaskRow({
   );
 }
 
-function ChannelTask({
-  kind,
-  title,
-  url,
-  reward,
-  done,
-}: {
-  kind: "community" | "payment";
-  title: string;
-  url: string;
-  reward: number;
-  done: boolean;
-}) {
-  const claim = useClaimChannelTask();
-  return (
-    <TaskRow
-      icon="📢"
-      title={title}
-      subtitle="Join required — verified by the bot"
-      reward={reward}
-      done={done}
-      pending={claim.isPending}
-      onGo={() => {
-        openLink(url);
-        window.setTimeout(() => {
-          claim.mutate({ kind } as never, {
-            onSuccess: (r) => toast.success(`✅ +${r.reward} FOX`),
-            onError: (e) => toast.error(friendlyError(e)),
-          });
-        }, 3000);
-      }}
-    />
-  );
-}
-
 export function TasksTab() {
-  const [section, setSection] = useState<Section>("daily");
-  const { data } = useHomeState();
+  const [section, setSection] = useState<Section>("main");
   const { data: taskData, isLoading } = useTasks();
   const claim = useClaimTask();
   const [busy, setBusy] = useState<string | null>(null);
 
-  const reward = data?.dailyTasks.reward ?? 50;
-  const done = data?.dailyTasks.done ?? [];
-
   const all = taskData?.tasks ?? [];
   const doneCount = all.filter((t) => t.done).length;
   const leftCount = all.length - doneCount;
-  const list = all
-    .filter((t) => t.section === section)
-    .sort((a, b) => Number(a.done) - Number(b.done));
-
-  const tabs: { id: Section; label: string }[] = [
-    { id: "daily", label: "Daily" },
-    { id: "main", label: "Main" },
-    ...((taskData?.tasks ?? []).some((t) => t.section === "partner")
-      ? [{ id: "partner" as Section, label: "🤝 Partner" }]
-      : []),
-  ];
+  const list = all.filter((t) => t.section === section).sort((a, b) => Number(a.done) - Number(b.done));
+  const countFor = (s: Section) => all.filter((t) => t.section === s && !t.done).length;
 
   return (
     <div className="space-y-3">
@@ -143,99 +86,59 @@ export function TasksTab() {
       </div>
 
       <div className="flex gap-2 overflow-x-auto pb-1">
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setSection(t.id)}
-            className={`shrink-0 rounded-full px-4 py-2 text-sm font-bold transition ${
-              section === t.id
-                ? "bg-primary text-primary-foreground"
-                : "bg-secondary text-secondary-foreground"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+        {SECTIONS.map((t) => {
+          const n = countFor(t.id);
+          return (
+            <button
+              key={t.id}
+              onClick={() => setSection(t.id)}
+              className={`flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-sm font-bold transition ${
+                section === t.id ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"
+              }`}
+            >
+              {t.label}
+              {n > 0 ? (
+                <span className="rounded-full bg-background/80 px-1.5 text-[10px] font-black text-foreground">{n}</span>
+              ) : null}
+            </button>
+          );
+        })}
       </div>
 
-      {section === "daily" ? (
-        <div className="space-y-2">
-          <GuideCard title="How tasks work">
-            Channel tasks are checked by the bot — if you are not a member, no reward is given.
-            Daily tasks reset at 00:00 UTC.
-          </GuideCard>
-          {[
-            {
-              kind: "community" as const,
-              title: "Visit community channel",
-              url: COMMUNITY_URL,
-              key: "daily_community",
-            },
-            {
-              kind: "payment" as const,
-              title: "Visit payment channel",
-              url: PAYMENT_URL,
-              key: "daily_payment",
-            },
-          ]
-            .sort((a, b) => Number(done.includes(a.key)) - Number(done.includes(b.key)))
-            .map((c) => (
-              <ChannelTask
-                key={c.kind}
-                kind={c.kind}
-                title={c.title}
-                url={c.url}
-                reward={reward}
-                done={done.includes(c.key)}
-              />
-            ))}
-          <TaskRow
-            icon="👥"
-            title="Invite 1 friend today"
-            subtitle="Share your link to complete"
-            reward={250}
-            done={false}
-          />
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {isLoading ? (
-            <p className="rounded-2xl border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
-              Loading…
-            </p>
-          ) : list.length === 0 ? (
-            <p className="rounded-2xl border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
-              No {section} tasks yet — added from the admin panel.
-            </p>
-          ) : (
-            list.map((t) => (
-              <TaskRow
-                key={t.id}
-                icon="🎯"
-                iconUrl={t.iconUrl}
-                title={t.title}
-                subtitle={`${t.verifyType === "channel" ? "Bot verified" : "Open link"}${
-                  t.maxCompletions > 0 ? ` · ${Math.max(0, t.maxCompletions - t.completions)} slots left` : ""
-                }`}
-                reward={t.reward}
-                done={t.done}
-                pending={busy === t.id && claim.isPending}
-                onGo={() => {
-                  openLink(t.url);
-                  setBusy(t.id);
-                  window.setTimeout(() => {
-                    claim.mutate(t.id, {
-                      onSuccess: (r) => toast.success(`✅ +${r.reward} FOX`),
-                      onError: (e) => toast.error(friendlyError(e)),
-                      onSettled: () => setBusy(null),
-                    });
-                  }, 5000);
-                }}
-              />
-            ))
-          )}
-        </div>
-      )}
+      <div className="space-y-2">
+        {isLoading ? (
+          <p className="rounded-2xl border border-dashed border-border p-4 text-center text-sm text-muted-foreground">Loading…</p>
+        ) : list.length === 0 ? (
+          <p className="rounded-2xl border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
+            No tasks here yet. New ones are coming soon 🦊
+          </p>
+        ) : (
+          list.map((t) => (
+            <TaskRow
+              key={t.id}
+              iconUrl={t.iconUrl}
+              title={t.title}
+              subtitle={`${t.verifyType === "channel" ? "Bot verified" : "Open link"}${
+                t.maxCompletions > 0 ? ` · ${Math.max(0, t.maxCompletions - t.completions)} slots left` : ""
+              }`}
+              reward={t.reward}
+              done={t.done}
+              pending={busy === t.id && claim.isPending}
+              onGo={() => {
+                openLink(t.url);
+                setBusy(t.id);
+                window.setTimeout(() => {
+                  claim.mutate(t.id, {
+                    onSuccess: (r) => toast.success(`✅ +${r.reward} FOX`),
+                    onError: (e) => toast.error(friendlyError(e)),
+                    onSettled: () => setBusy(null),
+                  });
+                }, 5000);
+              }}
+            />
+          ))
+        )}
+      </div>
     </div>
   );
 }

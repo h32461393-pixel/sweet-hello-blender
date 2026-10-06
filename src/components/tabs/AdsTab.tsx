@@ -1,3 +1,4 @@
+import { NETWORK_LOGOS } from "@/lib/constants";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Loader2, Play, Globe, Sparkles, Clock, CheckCircle2, Timer } from "lucide-react";
@@ -8,13 +9,6 @@ import { requireAd, showRewardPopup, useAdCooldown } from "@/components/AdGate";
 import type { AdNetwork } from "@/lib/adsgram";
 import { openLink } from "@/lib/telegram-client";
 
-const NETWORK_LOGOS: Record<string, string> = {
-  adsgram: "https://www.google.com/s2/favicons?domain=adsgram.ai&sz=128",
-  adsgram_int: "https://www.google.com/s2/favicons?domain=adsgram.ai&sz=128",
-  monetag: "https://www.google.com/s2/favicons?domain=monetag.com&sz=128",
-  gigapub: "https://www.google.com/s2/favicons?domain=gigapub.tech&sz=128",
-  monetix: "https://www.google.com/s2/favicons?domain=monetixads.online&sz=128",
-};
 
 const VISIT_SECONDS = 10;
 type Section = "ads" | "sites";

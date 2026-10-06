@@ -11,14 +11,11 @@ export function openFarmGuide() {
 }
 
 const STEPS = [
-  { icon: "🦊", title: "Welcome to Fox Farm!", text: "Your own little farm where you earn FOX tokens and turn them into real USDT. Let's take a quick tour." },
-  { icon: "⛏️", title: "Mine every hour", text: "Tap Start mining on the Farm tab. Your fox digs for 1 hour, then tap Claim to collect your FOX. Start again after each claim — the bot reminds you." },
-  { icon: "📅", title: "Daily streak", text: "Claim your daily reward every day for bigger prizes up to day 7. Miss a day and the streak starts again. Resets at 00:00 UTC." },
-  { icon: "✅", title: "Tasks", text: "Join channels and finish tasks in the Tasks tab for extra FOX. Rewards are checked automatically." },
-  { icon: "▶️", title: "Watch & earn", text: "The big middle button opens Watch. Watch rewarded ads and visit sites to earn more every day." },
-  { icon: "👥", title: "Invite friends", text: "Share your invite link from Refer. You earn when your real friends join and play." },
-  { icon: "💸", title: "Withdraw USDT", text: "100,000 FOX = $1. In Profile, complete the withdrawal requirements, add your BEP-20 wallet and request a payout." },
-  { icon: "🛡️", title: "Play fair", text: "One account per person and device. Fake referrals or cheating lead to suspension. Have fun farming!" },
+  { icon: "🦊", title: "Welcome to Fox Farm!", text: "Earn FOX and turn it into real USDT." },
+  { icon: "⛏️", title: "Mine every hour", text: "Tap Start mining, wait 1 hour, then Claim." },
+  { icon: "✅", title: "Tasks & ads", text: "Finish tasks and watch ads for extra FOX." },
+  { icon: "👥", title: "Invite friends", text: "Share your link and earn from real friends." },
+  { icon: "💸", title: "Withdraw USDT", text: "100,000 FOX = $1. Withdraw from Profile. Play fair — cheating means suspension." },
 ];
 
 export function FarmGuide() {

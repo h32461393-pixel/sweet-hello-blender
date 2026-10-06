@@ -373,7 +373,7 @@ export const adminSaveTask = createServerFn({ method: "POST" })
         url,
         reward,
         iconUrl: icon || null,
-        section: d.section === "partner" ? "partner" : "main",
+        section: (["partner", "bot", "miniapp"] as const).find((s) => s === d.section) ?? "main",
         verifyType: d.verifyType === "channel" ? "channel" : "timer",
         chatUsername: String(d.chatUsername ?? "").trim().slice(0, 60) || null,
         sortOrder: Math.trunc(Number(d.sortOrder ?? 0)) || 0,

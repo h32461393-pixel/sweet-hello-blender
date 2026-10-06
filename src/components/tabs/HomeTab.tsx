@@ -1,15 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { BadgeCheck, Coins, ExternalLink, Gift, HelpCircle, Moon, Pickaxe, Send, Sun, Ticket, Wallet } from "lucide-react";
+import { Coins, Gift, HelpCircle, Moon, Pickaxe, Send, Sun, Ticket, Wallet } from "lucide-react";
 import { MiningScene } from "@/components/farm/MiningScene";
 import { openFarmGuide } from "@/components/farm/FarmGuide";
-import { useQuery } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { GuideCard, SectionTitle, type TabKey } from "@/components/AppShell";
 import logo from "@/assets/fox-logo.png.asset.json";
-import { assetUrl, COMMUNITY_URL, PAYMENT_URL, SITE_URL } from "@/lib/constants";
-import { getPayoutProof } from "@/lib/farm.functions";
+import { assetUrl, COMMUNITY_URL, NETWORK_LOGOS, PAYMENT_URL } from "@/lib/constants";
 import { useAdsState, useTasks } from "@/hooks/useFarm";
 import { openLink, haptic } from "@/lib/telegram-client";
 import { useTheme } from "@/lib/theme";
@@ -337,7 +334,7 @@ function QuickTasks({ onTab }: { onTab?: ((t: TabKey) => void) | undefined }) {
         {openTasks.map((t) => (
           <button key={t.id} onClick={() => onTab?.("tasks")} className="flex w-full items-center gap-3 rounded-2xl border border-border bg-card p-3 text-left active:scale-[0.99]">
             <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-secondary">
-              {t.iconUrl ? <img src={t.iconUrl} alt="" className="h-full w-full object-cover" /> : "🎯"}
+              <img src={t.iconUrl || assetUrl(logo.url)} alt="" className="h-full w-full object-cover" loading="lazy" />
             </span>
             <span className="min-w-0 flex-1 truncate text-sm font-bold">{t.title}</span>
             <span className="rounded-lg bg-primary px-3 py-1 text-xs font-black text-primary-foreground">+{t.reward}</span>
@@ -345,7 +342,9 @@ function QuickTasks({ onTab }: { onTab?: ((t: TabKey) => void) | undefined }) {
         ))}
         {openAds.map((n) => (
           <button key={n.id} onClick={() => onTab?.("ads")} className="flex w-full items-center gap-3 rounded-2xl border border-border bg-card p-3 text-left active:scale-[0.99]">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10">▶️</span>
+            <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-muted">
+              <img src={n.logo || NETWORK_LOGOS[n.id] || assetUrl(logo.url)} alt={n.label} className="h-full w-full object-cover p-1" loading="lazy" />
+            </span>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-bold">{n.label}</span>
               <span className="block text-xs text-muted-foreground">{n.cap - n.used} ads left today</span>

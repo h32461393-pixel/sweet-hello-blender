@@ -379,8 +379,8 @@ export function ProfileTab() {
           <ul className="space-y-2">
             {data.referrals.list.map((r) => (
               <li key={r.id} className={`flex items-center gap-3 rounded-2xl border bg-card p-3 text-sm ${r.fake ? "border-destructive/40" : "border-border"}`}>
-                <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-full text-sm font-black ${r.fake ? "bg-destructive/15 text-destructive" : "bg-primary/15 text-primary"}`}>
-                  {r.fake ? "!" : (r.name || "?").slice(0, 1).toUpperCase()}
+                <span className={`grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full text-sm font-black ${r.fake ? "bg-destructive/15 text-destructive" : "bg-primary/15 text-primary"}`}>
+                  {r.photoUrl ? <img src={r.photoUrl} alt="" className="h-full w-full object-cover" loading="lazy" /> : r.fake ? "!" : (r.name || "?").replace("@", "").slice(0, 1).toUpperCase()}
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-semibold">{r.name}</p>
