@@ -1,3 +1,4 @@
+import { PayoutProof } from "@/components/PayoutProof";
 import { useState } from "react";
 import { toast } from "sonner";
 import { SectionTitle } from "@/components/AppShell";
@@ -227,6 +228,7 @@ export function ProfileTab() {
             </button>
           )}
           <WithdrawHistory items={w.history} />
+          <div className="mt-5"><PayoutProof /></div>
         </div>
       );
     }
@@ -308,6 +310,7 @@ export function ProfileTab() {
           )}
         </div>
         <WithdrawHistory items={w.history} />
+          <div className="mt-5"><PayoutProof /></div>
       </div>
     );
   }
