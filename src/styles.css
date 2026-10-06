@@ -238,3 +238,73 @@ html, body { transition: background-color .3s ease, color .3s ease; }
 @media (prefers-reduced-motion: reduce) {
   .animate-fade-up, .animate-pop-in, .animate-glow, .animate-shine { animation: none; }
 }
+
+/* ---- Farm scene (premium farm look) ---- */
+:root {
+  --sky-top: oklch(0.8 0.1 232);
+  --sky-bottom: oklch(0.94 0.05 190);
+  --hill-1: oklch(0.82 0.13 135);
+  --hill-2: oklch(0.71 0.16 142);
+  --hill-3: oklch(0.6 0.15 147);
+  --soil: oklch(0.55 0.085 58);
+  --soil-dark: oklch(0.42 0.075 52);
+  --sun: oklch(0.9 0.16 88);
+  --cloud: oklch(0.99 0.005 230);
+  --coin: oklch(0.84 0.16 85);
+  --coin-edge: oklch(0.66 0.14 70);
+}
+.dark {
+  --sky-top: oklch(0.18 0.06 268);
+  --sky-bottom: oklch(0.28 0.07 245);
+  --hill-1: oklch(0.36 0.07 150);
+  --hill-2: oklch(0.3 0.06 152);
+  --hill-3: oklch(0.25 0.05 155);
+  --soil: oklch(0.36 0.05 55);
+  --soil-dark: oklch(0.28 0.04 50);
+  --sun: oklch(0.93 0.04 95);
+  --cloud: oklch(0.55 0.03 260 / 0.55);
+  --coin: oklch(0.82 0.15 85);
+  --coin-edge: oklch(0.62 0.13 70);
+}
+@theme inline {
+  --color-sky-top: var(--sky-top);
+  --color-sky-bottom: var(--sky-bottom);
+  --color-hill-1: var(--hill-1);
+  --color-hill-2: var(--hill-2);
+  --color-hill-3: var(--hill-3);
+  --color-soil: var(--soil);
+  --color-soil-dark: var(--soil-dark);
+  --color-sun: var(--sun);
+  --color-cloud: var(--cloud);
+  --color-coin: var(--coin);
+  --color-coin-edge: var(--coin-edge);
+}
+
+@keyframes cloud-drift { from { transform: translateX(-160px) } to { transform: translateX(560px) } }
+@keyframes sun-spin { to { transform: rotate(360deg) } }
+@keyframes twinkle { 0%,100% { opacity: .2 } 50% { opacity: 1 } }
+@keyframes sway { 0%,100% { transform: skewX(-6deg) } 50% { transform: skewX(6deg) } }
+@keyframes fox-dig { 0%,100% { transform: translateY(0) rotate(0) } 25% { transform: translateY(4px) rotate(-6deg) } 50% { transform: translateY(-2px) rotate(3deg) } 75% { transform: translateY(5px) rotate(-3deg) } }
+@keyframes pick-swing { 0%,100% { transform: rotate(-35deg) } 45% { transform: rotate(45deg) } }
+@keyframes coin-rise { 0% { opacity: 0; transform: translate(0, 0) scale(.6) } 15% { opacity: 1 } 100% { opacity: 0; transform: translate(var(--dx, 0px), -90px) scale(1) rotate(360deg) } }
+@keyframes dirt-fly { 0% { opacity: 1; transform: translate(0,0) } 100% { opacity: 0; transform: translate(var(--dx, 10px), -28px) } }
+@keyframes zzz { 0% { opacity: 0; transform: translate(0,0) scale(.7) } 30% { opacity: 1 } 100% { opacity: 0; transform: translate(16px,-36px) scale(1.2) } }
+@keyframes coin-bounce { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-8px) } }
+@keyframes bird-fly { from { transform: translateX(-60px) translateY(0) } 50% { transform: translateX(240px) translateY(-14px) } to { transform: translateX(560px) translateY(0) } }
+
+@utility animate-cloud { animation: cloud-drift var(--dur, 60s) linear infinite; animation-delay: var(--delay, 0s); }
+@utility animate-sun { animation: sun-spin 40s linear infinite; }
+@utility animate-twinkle { animation: twinkle var(--dur, 3s) ease-in-out infinite; animation-delay: var(--delay, 0s); }
+@utility animate-sway { transform-origin: bottom center; animation: sway var(--dur, 3s) ease-in-out infinite; animation-delay: var(--delay, 0s); }
+@utility animate-fox-dig { animation: fox-dig .9s ease-in-out infinite; }
+@utility animate-pick { transform-origin: 80% 80%; animation: pick-swing .9s ease-in-out infinite; }
+@utility animate-coin-rise { animation: coin-rise 2.4s ease-out infinite; animation-delay: var(--delay, 0s); }
+@utility animate-dirt { animation: dirt-fly .9s ease-out infinite; animation-delay: var(--delay, 0s); }
+@utility animate-zzz { animation: zzz 2.6s ease-out infinite; animation-delay: var(--delay, 0s); }
+@utility animate-coin-bounce { animation: coin-bounce 1.2s ease-in-out infinite; animation-delay: var(--delay, 0s); }
+@utility animate-bird { animation: bird-fly var(--dur, 26s) linear infinite; animation-delay: var(--delay, 0s); }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-cloud, .animate-sun, .animate-twinkle, .animate-sway, .animate-fox-dig, .animate-pick,
+  .animate-coin-rise, .animate-dirt, .animate-zzz, .animate-coin-bounce, .animate-bird { animation: none; }
+}
