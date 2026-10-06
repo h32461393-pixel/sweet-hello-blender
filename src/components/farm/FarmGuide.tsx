@@ -28,6 +28,7 @@ export function FarmGuide() {
   useEffect(() => {
     try {
       if (!localStorage.getItem(KEY)) setOpen(true);
+      else window.dispatchEvent(new Event("foxfarm:guide-closed"));
     } catch {
       /* storage blocked */
     }
@@ -50,6 +51,7 @@ export function FarmGuide() {
       /* ignore */
     }
     setOpen(false);
+    window.dispatchEvent(new Event("foxfarm:guide-closed"));
   };
 
   return (

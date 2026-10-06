@@ -83,7 +83,9 @@ export function AdsTab() {
     }, 1000);
   }
 
-  const networks = data?.networks ?? [];
+  const networks = [...(data?.networks ?? [])].sort(
+    (a, b) => Number(a.used >= a.cap) - Number(b.used >= b.cap),
+  );
   const sites = data?.sites ?? [];
 
   return (
