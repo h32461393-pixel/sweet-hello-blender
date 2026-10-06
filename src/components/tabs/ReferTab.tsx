@@ -107,7 +107,7 @@ export function ReferTab() {
       ) : (
         <ul className="space-y-2">
           {refs.list.map((r) => (
-            <li key={r.id} className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3">
+            <li key={r.id} className={`animate-fade-up flex items-center gap-3 rounded-2xl border p-3 shadow-sm ${r.fake ? "border-destructive/30 bg-destructive/5" : "border-primary/20 bg-gradient-to-r from-card to-primary/10"}`}>
               <span className={`relative grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full text-sm font-black ${r.fake ? "bg-destructive/15 text-destructive" : "bg-primary/15 text-primary"}`}>
                 {r.photoUrl ? (
                   <img src={r.photoUrl} alt="" className="h-full w-full object-cover" loading="lazy" />

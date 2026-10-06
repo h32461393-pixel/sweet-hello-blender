@@ -332,17 +332,17 @@ function QuickTasks({ onTab }: { onTab?: ((t: TabKey) => void) | undefined }) {
       <SectionTitle>⚡ Quick tasks</SectionTitle>
       <div className="space-y-2">
         {openTasks.map((t) => (
-          <button key={t.id} onClick={() => onTab?.("tasks")} className="flex w-full items-center gap-3 rounded-2xl border border-border bg-card p-3 text-left active:scale-[0.99]">
-            <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-secondary">
+          <button key={t.id} onClick={() => onTab?.("tasks")} className="animate-fade-up flex w-full items-center gap-3 rounded-2xl border border-primary/20 bg-gradient-to-r from-card to-primary/10 p-3 text-left shadow-sm active:scale-[0.99]">
+            <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-secondary ring-2 ring-primary/20">
               <img src={t.iconUrl || assetUrl(logo.url)} alt="" className="h-full w-full object-cover" loading="lazy" />
             </span>
             <span className="min-w-0 flex-1 truncate text-sm font-bold">{t.title}</span>
-            <span className="rounded-lg bg-primary px-3 py-1 text-xs font-black text-primary-foreground">+{t.reward}</span>
+            <span className="animate-glow rounded-lg bg-primary px-3 py-1 text-xs font-black text-primary-foreground">🪙 +{t.reward}</span>
           </button>
         ))}
         {openAds.map((n) => (
-          <button key={n.id} onClick={() => onTab?.("ads")} className="flex w-full items-center gap-3 rounded-2xl border border-border bg-card p-3 text-left active:scale-[0.99]">
-            <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-muted">
+          <button key={n.id} onClick={() => onTab?.("ads")} className="animate-fade-up flex w-full items-center gap-3 rounded-2xl border border-usdt/25 bg-gradient-to-r from-card to-usdt/10 p-3 text-left shadow-sm active:scale-[0.99]">
+            <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-muted ring-2 ring-usdt/25">
               <img src={n.logo || NETWORK_LOGOS[n.id] || assetUrl(logo.url)} alt={n.label} className="h-full w-full object-cover p-1" loading="lazy" />
             </span>
             <span className="min-w-0 flex-1">
