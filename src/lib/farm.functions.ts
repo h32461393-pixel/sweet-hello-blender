@@ -1104,7 +1104,7 @@ export const getTasks = createServerFn({ method: "POST" })
         title: t.title as string,
         url: t.url as string,
         reward: Number(t.reward ?? 0),
-        verifyType: (t.verify_type as string) ?? "timer",
+        verifyType: telegramChatFor(null, t.url as string) ? "channel" : ((t.verify_type as string) ?? "timer"),
         iconUrl: (t.icon_url as string) ?? null,
         done: doneKeys.has(`task:${t.id as string}`),
       })),
@@ -1127,7 +1127,7 @@ export const claimTask = createServerFn({ method: "POST" })
 
     const { data: task } = await ctx.db
       .from("tasks")
-      .select("id, title, reward, verify_type, chat_username, active, max_completions")
+      .select("id, title, url, reward, verify_type, chat_username, active, max_completions")
       .eq("id", data.taskId)
       .maybeSingle();
     if (!task || !task.active) throw new Error("This task is no longer available");
@@ -1140,9 +1140,11 @@ export const claimTask = createServerFn({ method: "POST" })
       if ((c.count ?? 0) >= cap) throw new Error("This task is full — no slots left");
     }
 
-    if (task.verify_type === "channel" && task.chat_username) {
+    // Every Telegram channel/group task is checked by the bot, even if the admin chose "timer".
+    const chat = telegramChatFor(task.chat_username as string | null, task.url as string | null);
+    if (chat) {
       const { isChatMember } = await import("./telegram.server");
-      const member = await isChatMember(String(task.chat_username), ctx.tg.id);
+      const member = await isChatMember(chat, ctx.tg.id);
       if (!member) throw new Error("NOT_JOINED");
     }
 
@@ -1162,6 +1164,17 @@ export const claimTask = createServerFn({ method: "POST" })
     });
     return { reward, balance: Number(balance ?? 0) };
   });
+
+/** Public @username of a Telegram channel/group task, or null (bots, mini apps, invite links, websites). */
+function telegramChatFor(chatUsername: string | null, url: string | null): string | null {
+  const c = String(chatUsername ?? "").trim();
+  if (c) return c.startsWith("@") || c.startsWith("-") ? c : `@${c}`;
+  const m = /^https?:\/\/(?:t\.me|telegram\.me)\/([A-Za-z0-9_]{4,32})\/?(?:\d+)?\/?$/i.exec(String(url ?? "").trim());
+  if (!m) return null;
+  const name = m[1]!;
+  if (/bot$/i.test(name)) return null;
+  return `@${name}`;
+}
 
 /** Checks every required channel on each app open. Returns the ones not joined yet. */
 export const checkRequiredChannels = createServerFn({ method: "POST" })
