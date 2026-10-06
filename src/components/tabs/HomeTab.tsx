@@ -383,7 +383,7 @@ export function HomeTab({ onTab }: { onTab?: (t: TabKey) => void }) {
 }
 
 /** Two unfinished tasks + two ad networks with views left; refresh automatically as they complete. */
-function QuickTasks({ onTab }: { onTab?: (t: TabKey) => void }) {
+function QuickTasks({ onTab }: { onTab?: ((t: TabKey) => void) | undefined }) {
   const tasks = useTasks();
   const ads = useAdsState();
   const openTasks = (tasks.data?.tasks ?? []).filter((t) => !t.done).slice(0, 2);
