@@ -14,6 +14,7 @@ import { ProfileTab } from "@/components/tabs/ProfileTab";
 import { syncUser, getAppStatus } from "@/lib/farm.functions";
 import { useQuery } from "@tanstack/react-query";
 import { ChannelGate } from "@/components/ChannelGate";
+import { FarmGuide } from "@/components/farm/FarmGuide";
 import { getInitData, getWebApp } from "@/lib/telegram-client";
 import { MINI_APP_URL, BOT_USERNAME, assetUrl } from "@/lib/constants";
 import logo from "@/assets/fox-logo.png.asset.json";
@@ -88,6 +89,7 @@ function Index() {
         {tab === "profile" && <ProfileTab />}
       </AppShell>
       <AdOverlay />
+      <FarmGuide />
       <Toaster position="top-center" />
       </MaintenanceGate>
     </ChannelGate>

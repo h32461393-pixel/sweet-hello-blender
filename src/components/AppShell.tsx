@@ -2,6 +2,7 @@ import { type ReactNode } from "react";
 import { Home, ListChecks, Play, Users, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { t, useLang } from "@/lib/i18n";
+import { FarmBackground } from "@/components/farm/FarmBackground";
 
 export type TabKey = "home" | "tasks" | "ads" | "refer" | "profile";
 
@@ -24,11 +25,11 @@ export function AppShell({
 }) {
   const lang = useLang();
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-background shadow-2xl shadow-foreground/10 transition-colors duration-300">
-      <div className="h-1.5 bg-primary" />
-      <main className="flex-1 px-4 pb-28 pt-4">{children}</main>
+    <div className="relative mx-auto flex min-h-screen w-full max-w-md flex-col shadow-2xl shadow-foreground/10 transition-colors duration-300">
+      <FarmBackground />
+      <main className="animate-fade-up relative z-10 flex-1 px-4 pb-28 pt-4">{children}</main>
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto max-w-md border-t border-border bg-card/95 px-2 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_-16px_var(--foreground)] backdrop-blur">
+      <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto max-w-md border-t-4 border-wood/60 bg-card/95 px-2 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_-16px_var(--foreground)] backdrop-blur">
         <ul className="flex items-end justify-between">
           {TABS.map(({ key, labelKey, icon: Icon }) => {
             const active = tab === key;
