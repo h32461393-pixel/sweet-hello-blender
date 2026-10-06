@@ -954,11 +954,23 @@ export const verifyWithdrawUser = createServerFn({ method: "POST" })
       const { count } = await ctx.db.from("app_users").select("id", { count: "exact", head: true }).eq("device_hash", u.device_hash).neq("id", u.id);
       if ((count ?? 0) > 0) reasons.push("Multiple accounts on the same device are not allowed.");
     }
-    // 3. Too many accounts from one network.
-    if (u.signup_ip) {
-      const { count } = await ctx.db.from("app_users").select("id", { count: "exact", head: true }).eq("signup_ip", u.signup_ip);
-      if ((count ?? 0) >= 4) reasons.push("Too many accounts from the same network.");
-    }
+    // 3. Shared network detection — flag for review instead of auto-suspending.
+// Multiple legitimate users can share the same public IP.
+if (u.signup_ip) {
+  const { count } = await ctx.db
+    .from("app_users")
+    .select("id", { count: "exact", head: true })
+    .eq("signup_ip", u.signup_ip);
+
+  if ((count ?? 0) >= 4) {
+    await ctx.db
+      .from("app_users")
+      .update({
+        suspend_reason: "Shared network detected - manual review recommended.",
+      })
+      .eq("id", u.id);
+  }
+}
     // 4. Mostly fake referrals.
     const { data: refs } = await ctx.db.from("referrals").select("fake").eq("referrer_id", u.id);
     const fakeRefs = (refs ?? []).filter((r) => r.fake).length;
