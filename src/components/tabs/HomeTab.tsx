@@ -10,6 +10,7 @@ import { GuideCard, SectionTitle, type TabKey } from "@/components/AppShell";
 import logo from "@/assets/fox-logo.png.asset.json";
 import { assetUrl, COMMUNITY_URL, PAYMENT_URL, SITE_URL } from "@/lib/constants";
 import { getPayoutProof } from "@/lib/farm.functions";
+import { useAdsState, useTasks } from "@/hooks/useFarm";
 import { openLink, haptic } from "@/lib/telegram-client";
 import { useTheme } from "@/lib/theme";
 import { requireAd, showRewardPopup } from "@/components/AdGate";
@@ -230,6 +231,8 @@ export function HomeTab({ onTab }: { onTab?: (t: TabKey) => void }) {
         ))}
       </div>
 
+      <QuickTasks onTab={onTab} />
+
       {/* reward code */}
       <SectionTitle>🎟️ Reward code</SectionTitle>
       <div className="rounded-3xl border border-border bg-card p-4">
@@ -376,5 +379,40 @@ export function HomeTab({ onTab }: { onTab?: (t: TabKey) => void }) {
         </div>
       </section>
     </div>
+  );
+}
+
+/** Two unfinished tasks + two ad networks with views left; refresh automatically as they complete. */
+function QuickTasks({ onTab }: { onTab?: ((t: TabKey) => void) | undefined }) {
+  const tasks = useTasks();
+  const ads = useAdsState();
+  const openTasks = (tasks.data?.tasks ?? []).filter((t) => !t.done).slice(0, 2);
+  const openAds = (ads.data?.networks ?? []).filter((n) => n.used < n.cap).slice(0, 2);
+  if (!openTasks.length && !openAds.length) return null;
+  return (
+    <>
+      <SectionTitle>⚡ Quick tasks</SectionTitle>
+      <div className="space-y-2">
+        {openTasks.map((t) => (
+          <button key={t.id} onClick={() => onTab?.("tasks")} className="flex w-full items-center gap-3 rounded-2xl border border-border bg-card p-3 text-left active:scale-[0.99]">
+            <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-secondary">
+              {t.iconUrl ? <img src={t.iconUrl} alt="" className="h-full w-full object-cover" /> : "🎯"}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-sm font-bold">{t.title}</span>
+            <span className="rounded-lg bg-primary px-3 py-1 text-xs font-black text-primary-foreground">+{t.reward}</span>
+          </button>
+        ))}
+        {openAds.map((n) => (
+          <button key={n.id} onClick={() => onTab?.("ads")} className="flex w-full items-center gap-3 rounded-2xl border border-border bg-card p-3 text-left active:scale-[0.99]">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10">▶️</span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-bold">{n.label}</span>
+              <span className="block text-xs text-muted-foreground">{n.cap - n.used} ads left today</span>
+            </span>
+            <span className="rounded-lg bg-usdt/15 px-3 py-1 text-xs font-black text-usdt">+{n.reward}</span>
+          </button>
+        ))}
+      </div>
+    </>
   );
 }

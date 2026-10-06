@@ -1,12 +1,31 @@
 import { useSyncExternalStore } from "react";
 
 export const LANGS = [
-  { code: "en", label: "English", flag: "🇬🇧" },
-  { code: "si", label: "සිංහල", flag: "🇱🇰" },
-  { code: "ru", label: "Русский", flag: "🇷🇺" },
-  { code: "tr", label: "Türkçe", flag: "🇹🇷" },
-  { code: "ar", label: "العربية", flag: "🇸🇦" },
+  { code: "en", label: "English", native: "English", flag: "🇺🇸" },
+  { code: "si", label: "සිංහල", native: "Sinhala", flag: "🇱🇰" },
+  { code: "ru", label: "Русский", native: "Russian", flag: "🇷🇺" },
+  { code: "uk", label: "Українська", native: "Ukrainian", flag: "🇺🇦" },
+  { code: "fr", label: "Français", native: "French", flag: "🇫🇷" },
+  { code: "ar", label: "العربية", native: "Arabic", flag: "🇸🇦" },
+  { code: "fa", label: "فارسی", native: "Persian", flag: "🇮🇷" },
+  { code: "id", label: "Bahasa Indonesia", native: "Indonesian", flag: "🇮🇩" },
+  { code: "tr", label: "Türkçe", native: "Turkish", flag: "🇹🇷" },
+  { code: "vi", label: "Tiếng Việt", native: "Vietnamese", flag: "🇻🇳" },
+  { code: "es", label: "Español", native: "Spanish", flag: "🇪🇸" },
+  { code: "mx", label: "Español (MX)", native: "Spanish (MX)", flag: "🇲🇽" },
+  { code: "pt", label: "Português", native: "Portuguese", flag: "🇵🇹" },
+  { code: "ur", label: "اردو", native: "Urdu", flag: "🇵🇰" },
+  { code: "fil", label: "Filipino", native: "Filipino", flag: "🇵🇭" },
 ] as const;
+
+export const LANG_PICKED_KEY = "foxfarm.lang.picked";
+export function hasPickedLang(): boolean {
+  try {
+    return !!window.localStorage.getItem(LANG_PICKED_KEY);
+  } catch {
+    return true;
+  }
+}
 
 export type LangCode = (typeof LANGS)[number]["code"];
 
@@ -21,6 +40,9 @@ export function getLang(): LangCode {
 
 export function setLang(code: LangCode) {
   window.localStorage.setItem(KEY, code);
+  window.localStorage.setItem(LANG_PICKED_KEY, "1");
+  document.documentElement.dir = ["ar", "fa", "ur"].includes(code) ? "rtl" : "ltr";
+  document.documentElement.lang = code;
   listeners.forEach((l) => l());
 }
 
@@ -157,7 +179,18 @@ const ar: Dict = {
   saved: "تم الحفظ!",
 };
 
-const DICTS: Record<LangCode, Dict> = { en, si, ru, tr, ar };
+const tabs = (farm: string, tasks: string, ads: string, refer: string, profile: string, language: string, back: string, save: string): Dict => ({ farm, tasks, ads, refer, profile, language, back, save });
+const uk = tabs("Ферма", "Завдання", "Реклама", "Друзі", "Профіль", "Мова", "Назад", "Зберегти");
+const fr = tabs("Ferme", "Tâches", "Pubs", "Inviter", "Profil", "Langue", "Retour", "Enregistrer");
+const fa = tabs("مزرعه", "وظایف", "تبلیغات", "دعوت", "پروفایل", "زبان", "بازگشت", "ذخیره");
+const id = tabs("Kebun", "Tugas", "Iklan", "Undang", "Profil", "Bahasa", "Kembali", "Simpan");
+const vi = tabs("Nông trại", "Nhiệm vụ", "Quảng cáo", "Mời", "Hồ sơ", "Ngôn ngữ", "Quay lại", "Lưu");
+const es = tabs("Granja", "Tareas", "Anuncios", "Invitar", "Perfil", "Idioma", "Atrás", "Guardar");
+const pt = tabs("Fazenda", "Tarefas", "Anúncios", "Convidar", "Perfil", "Idioma", "Voltar", "Salvar");
+const ur = tabs("فارم", "کام", "اشتہارات", "دعوت", "پروفائل", "زبان", "واپس", "محفوظ کریں");
+const fil = tabs("Bukid", "Gawain", "Ads", "Imbita", "Profile", "Wika", "Bumalik", "I-save");
+
+const DICTS: Record<LangCode, Dict> = { en, si, ru, tr, ar, uk, fr, fa, id, vi, es, mx: es, pt, ur, fil };
 
 export function t(lang: LangCode, key: keyof typeof en): string {
   return DICTS[lang][key] ?? en[key] ?? key;

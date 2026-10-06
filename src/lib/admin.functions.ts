@@ -326,10 +326,19 @@ export const adminListTasks = createServerFn({ method: "POST" })
     const ctx = await adminCtx(data);
     const { data: rows } = await ctx.db
       .from("tasks")
-      .select("id, section, title, url, reward, verify_type, chat_username, icon_url, active, sort_order")
+      .select("id, section, title, url, reward, verify_type, chat_username, icon_url, active, sort_order, max_completions")
       .order("sort_order", { ascending: true })
       .limit(100);
-    return { tasks: rows ?? [] };
+    const counts = await Promise.all(
+      (rows ?? []).map(async (t) => {
+        const r = await ctx.db
+          .from("task_completions")
+          .select("task_key", { count: "exact", head: true })
+          .eq("task_key", `task:${t.id as string}`);
+        return r.count ?? 0;
+      }),
+    );
+    return { tasks: (rows ?? []).map((t, i) => ({ ...t, completions: counts[i] ?? 0 })) };
   });
 
 export const adminSaveTask = createServerFn({ method: "POST" })
@@ -346,6 +355,7 @@ export const adminSaveTask = createServerFn({ method: "POST" })
         iconUrl?: string | null;
         active: boolean;
         sortOrder?: number;
+        maxCompletions?: number;
       },
     ) => {
       vAuth(d);
@@ -368,6 +378,7 @@ export const adminSaveTask = createServerFn({ method: "POST" })
         chatUsername: String(d.chatUsername ?? "").trim().slice(0, 60) || null,
         sortOrder: Math.trunc(Number(d.sortOrder ?? 0)) || 0,
         active: Boolean(d.active),
+        maxCompletions: Math.min(10_000_000, Math.max(0, Math.trunc(Number(d.maxCompletions ?? 0)) || 0)),
       };
     },
   )
@@ -383,6 +394,7 @@ export const adminSaveTask = createServerFn({ method: "POST" })
       icon_url: data.iconUrl,
       active: data.active,
       sort_order: data.sortOrder,
+      max_completions: data.maxCompletions,
     };
     const res = data.id
       ? await ctx.db.from("tasks").update(row).eq("id", data.id)

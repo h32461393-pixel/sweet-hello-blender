@@ -351,6 +351,7 @@ export type Database = {
           created_at: string
           icon_url: string | null
           id: string
+          max_completions: number
           reward: number
           section: string
           sort_order: number
@@ -364,6 +365,7 @@ export type Database = {
           created_at?: string
           icon_url?: string | null
           id?: string
+          max_completions?: number
           reward?: number
           section?: string
           sort_order?: number
@@ -377,6 +379,7 @@ export type Database = {
           created_at?: string
           icon_url?: string | null
           id?: string
+          max_completions?: number
           reward?: number
           section?: string
           sort_order?: number

@@ -429,6 +429,7 @@ const EMPTY_TASK = {
   iconUrl: "",
   active: true,
   sortOrder: 0,
+  maxCompletions: 0,
 };
 
 function Tasks({ creds }: { creds: Creds }) {
@@ -497,6 +498,11 @@ function Tasks({ creds }: { creds: Creds }) {
             value={String(form.reward)}
             onChange={(v) => setForm((f) => ({ ...f, reward: Number(v) || 0 }))}
           />
+          <Field
+            label="Max completions (0 = unlimited) — raise it to add more slots"
+            value={String(form.maxCompletions)}
+            onChange={(v) => setForm((f) => ({ ...f, maxCompletions: Number(v) || 0 }))}
+          />
           <button
             onClick={() => save.mutate()}
             className="w-full rounded-xl bg-primary py-2 text-sm font-black text-primary-foreground"
@@ -515,7 +521,8 @@ function Tasks({ creds }: { creds: Creds }) {
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-bold">{t.title as string}</p>
               <p className="text-xs text-muted-foreground">
-                {t.section as string} · +{Number(t.reward)} · {t.active ? "active" : "hidden"}
+                {t.section as string} · +{Number(t.reward)} · {t.active ? "active" : "hidden"} · {Number(t.completions ?? 0)}/{Number(t.max_completions ?? 0) || "∞"} done
+                {Number(t.max_completions ?? 0) > 0 && Number(t.completions ?? 0) >= Number(t.max_completions) ? " · FULL" : ""}
               </p>
             </div>
             <button
@@ -531,6 +538,7 @@ function Tasks({ creds }: { creds: Creds }) {
                   iconUrl: (t.icon_url as string) ?? "",
                   active: Boolean(t.active),
                   sortOrder: Number(t.sort_order ?? 0),
+                  maxCompletions: Number(t.max_completions ?? 0),
                 })
               }
               className="rounded-lg bg-secondary px-2 py-1 text-xs font-bold"

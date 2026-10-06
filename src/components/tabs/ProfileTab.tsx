@@ -12,7 +12,8 @@ import {
 import { getPayoutProof } from "@/lib/farm.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
-import { LANGS, setLang, t, useLang, type LangCode } from "@/lib/i18n";
+import { LANGS, t, useLang } from "@/lib/i18n";
+import { LanguageGrid } from "@/components/LanguagePicker";
 import { COMMUNITY_URL, MINI_APP_URL, PAYMENT_URL, SITE_URL } from "@/lib/constants";
 import { openLink } from "@/lib/telegram-client";
 import {
@@ -452,22 +453,7 @@ export function ProfileTab() {
       <div>
         <SubHeader title={t(lang, "back")} onBack={() => setScreen("main")} />
         <SectionTitle>🌐 {t(lang, "language")}</SectionTitle>
-        <ul className="space-y-2">
-          {LANGS.map((l) => (
-            <li key={l.code}>
-              <button
-                onClick={() => setLang(l.code as LangCode)}
-                className={`flex w-full items-center gap-3 rounded-2xl border p-3.5 text-sm font-semibold ${
-                  lang === l.code ? "border-primary bg-primary/10" : "border-border bg-card"
-                }`}
-              >
-                <span className="text-lg">{l.flag}</span>
-                <span className="flex-1 text-left">{l.label}</span>
-                {lang === l.code ? <span className="text-primary">✓</span> : null}
-              </button>
-            </li>
-          ))}
-        </ul>
+        <LanguageGrid />
       </div>
     );
   }

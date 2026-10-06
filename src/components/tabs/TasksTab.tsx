@@ -110,7 +110,10 @@ export function TasksTab() {
   const reward = data?.dailyTasks.reward ?? 50;
   const done = data?.dailyTasks.done ?? [];
 
-  const list = (taskData?.tasks ?? [])
+  const all = taskData?.tasks ?? [];
+  const doneCount = all.filter((t) => t.done).length;
+  const leftCount = all.length - doneCount;
+  const list = all
     .filter((t) => t.section === section)
     .sort((a, b) => Number(a.done) - Number(b.done));
 
@@ -125,6 +128,19 @@ export function TasksTab() {
   return (
     <div className="space-y-3">
       <h1 className="text-xl font-black">📋 Tasks</h1>
+
+      <div className="grid grid-cols-3 gap-2">
+        {[
+          { label: "Done", value: doneCount, cls: "text-usdt" },
+          { label: "Left", value: leftCount, cls: "text-primary" },
+          { label: "Total", value: all.length, cls: "text-foreground" },
+        ].map((x) => (
+          <div key={x.label} className="rounded-2xl border border-border bg-card p-2.5 text-center">
+            <p className={`text-xl font-black tabular-nums ${x.cls}`}>{x.value}</p>
+            <p className="text-[11px] font-bold text-muted-foreground">{x.label}</p>
+          </div>
+        ))}
+      </div>
 
       <div className="flex gap-2 overflow-x-auto pb-1">
         {tabs.map((t) => (
@@ -198,7 +214,9 @@ export function TasksTab() {
                 icon="🎯"
                 iconUrl={t.iconUrl}
                 title={t.title}
-                subtitle={t.verifyType === "channel" ? "Join required — bot verified" : "Open the link to complete"}
+                subtitle={`${t.verifyType === "channel" ? "Bot verified" : "Open link"}${
+                  t.maxCompletions > 0 ? ` · ${Math.max(0, t.maxCompletions - t.completions)} slots left` : ""
+                }`}
                 reward={t.reward}
                 done={t.done}
                 pending={busy === t.id && claim.isPending}

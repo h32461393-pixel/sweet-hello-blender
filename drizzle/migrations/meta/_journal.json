@@ -43,6 +43,13 @@
       "when": 1790139080929,
       "tag": "0005_fix_referral_claim_row_lock",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791266939846,
+      "tag": "0006_task_max_completions",
+      "breakpoints": true
     }
   ]
 }
