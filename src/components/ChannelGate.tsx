@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import type { ReactNode } from "react";
 import { checkRequiredChannels } from "@/lib/farm.functions";
 import { getInitData, openLink } from "@/lib/telegram-client";
+import { REQUIRED_CHANNELS } from "@/lib/constants";
 
 /** Blocks the app until the user has joined every required channel (checked by the bot on each open). */
 export function ChannelGate({ children }: { children: ReactNode }) {
@@ -15,7 +16,10 @@ export function ChannelGate({ children }: { children: ReactNode }) {
     retry: 2,
   });
 
-  const missing = q.data?.missing ?? [];
+  // Fail closed: if the check errors, keep the gate up and list every channel.
+  const missing = q.isError
+    ? REQUIRED_CHANNELS.map(({ title, url }) => ({ title, url }))
+    : (q.data?.missing ?? []);
   if (q.isLoading) {
     return (
       <main className="grid min-h-screen place-items-center bg-background text-sm text-muted-foreground">
@@ -23,7 +27,7 @@ export function ChannelGate({ children }: { children: ReactNode }) {
       </main>
     );
   }
-  if (q.isError || missing.length === 0) return <>{children}</>;
+  if (!q.isError && q.data && missing.length === 0) return <>{children}</>;
 
   return (
     <main className="fixed inset-0 z-50 grid place-items-center bg-background/95 p-5 backdrop-blur">
@@ -31,7 +35,9 @@ export function ChannelGate({ children }: { children: ReactNode }) {
         <div className="text-center text-5xl">📢</div>
         <h1 className="mt-2 text-center text-xl font-black">Join our channels</h1>
         <p className="mt-1 text-center text-xs text-muted-foreground">
-          Join all channels below, then tap Verify to continue.
+          {q.isError
+            ? "We could not confirm your membership. Join all channels, then tap Verify."
+            : "Join all channels below, then tap Verify to continue."}
         </p>
         <ul className="mt-4 space-y-2">
           {missing.map((c) => (
