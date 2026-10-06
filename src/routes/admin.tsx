@@ -456,7 +456,7 @@ function Tasks({ creds }: { creds: Creds }) {
       <Card>
         <div className="space-y-2">
           <div className="flex gap-2">
-            {["main", "partner"].map((s) => (
+            {["main", "partner", "bot", "miniapp"].map((s) => (
               <button
                 key={s}
                 onClick={() => setForm((f) => ({ ...f, section: s }))}
@@ -863,7 +863,6 @@ function Settings({ creds }: { creds: Creds }) {
           {num("tokens_per_usd", "FOX per $1", 100000)}
           {num("req_daily_ads", "Daily ads needed", 30)}
           {num("req_referrals", "Referrals needed", 2)}
-          {num("req_daily_tasks", "Daily tasks needed", 2)}
         </div>
       </Card>
       <button onClick={() => save.mutate()} disabled={save.isPending} className="w-full rounded-xl bg-primary py-3 text-sm font-black text-primary-foreground disabled:opacity-50">

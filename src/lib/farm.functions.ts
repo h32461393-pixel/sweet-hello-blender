@@ -648,7 +648,7 @@ export const getProfileState = createServerFn({ method: "POST" })
     const refList = refs.data ?? [];
     const refereeIds = refList.map((r) => r.referee_id as string);
     const refereeRows = refereeIds.length
-      ? await ctx.db.from("app_users").select("id, username, first_name").in("id", refereeIds)
+      ? await ctx.db.from("app_users").select("id, username, first_name, photo_url").in("id", refereeIds)
       : { data: [], error: null };
     if (refereeRows.error) {
       console.error("[profile] referral names query failed", refereeRows.error);
@@ -656,7 +656,11 @@ export const getProfileState = createServerFn({ method: "POST" })
     const refereeById = new Map(
       (refereeRows.data ?? []).map((row) => [
         row.id as string,
-        { username: row.username as string | null, firstName: row.first_name as string | null },
+        {
+          username: row.username as string | null,
+          firstName: row.first_name as string | null,
+          photoUrl: (row.photo_url as string | null) ?? null,
+        },
       ]),
     );
 
@@ -679,6 +683,7 @@ export const getProfileState = createServerFn({ method: "POST" })
           return {
             id: r.id as string,
             name: ru?.username ? `@${ru.username}` : (ru?.firstName ?? "Fox farmer"),
+            photoUrl: ru?.photoUrl && /^https:\/\//.test(ru.photoUrl) ? ru.photoUrl : null,
             status: r.status as string,
             pending: Number(r.pending_reward ?? 0),
             stages: { join: !!r.stage_join, day1: !!r.stage_day1, day2: !!r.stage_day2 },
@@ -861,14 +866,10 @@ async function withdrawRequirements(ctx: Ctx, userId: string, cfg: WdCfg) {
       .eq("day", today),
     ctx.db.from("task_completions").select("task_key").eq("user_id", userId).eq("day", today).eq("task_key", "wd_verify"),
   ]);
-  const taskCount = (tasks.data ?? []).filter((t) => {
-    const k = String(t.task_key);
-    return !k.startsWith("site:") && k !== "wd_verify";
-  }).length;
+  void tasks;
   const items = [
     { key: "ads", label: "Watch ads today", have: ads.count ?? 0, need: cfg.reqDailyAds },
     { key: "refs", label: "Valid referrals", have: refs.count ?? 0, need: cfg.reqReferrals },
-    { key: "tasks", label: "Daily tasks today", have: taskCount, need: cfg.reqDailyTasks },
   ].map((r) => ({ ...r, done: r.have >= r.need }));
   return { items, allDone: items.every((r) => r.done), verifiedToday: (verified.data ?? []).length > 0 };
 }
@@ -1099,7 +1100,7 @@ export const getTasks = createServerFn({ method: "POST" })
         completions: count,
         maxCompletions: cap,
         id: t.id as string,
-        section: (t.section as string) === "partner" ? "partner" : "main",
+        section: (["partner", "bot", "miniapp"] as const).find((s) => s === t.section) ?? "main",
         title: t.title as string,
         url: t.url as string,
         reward: Number(t.reward ?? 0),

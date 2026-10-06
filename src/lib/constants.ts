@@ -32,3 +32,12 @@ export const REQUIRED_CHANNELS: { title: string; chat: string; url: string }[] =
 
 /** Admin's personal invite link used on partner-channel posts by default. */
 export const ADMIN_REFER_LINK = "https://t.me/Fox_farm1_bot/farm?startapp=ref5419054691";
+
+/** Fallback logos for ad networks (used when the admin has not set a custom logo). */
+export const NETWORK_LOGOS: Record<string, string> = {
+  adsgram: "https://www.google.com/s2/favicons?domain=adsgram.ai&sz=128",
+  adsgram_int: "https://www.google.com/s2/favicons?domain=adsgram.ai&sz=128",
+  monetag: "https://www.google.com/s2/favicons?domain=monetag.com&sz=128",
+  gigapub: "https://www.google.com/s2/favicons?domain=gigapub.tech&sz=128",
+  monetix: "https://www.google.com/s2/favicons?domain=monetixads.online&sz=128",
+};
