@@ -1073,15 +1073,31 @@ export const getTasks = createServerFn({ method: "POST" })
     const [list, done] = await Promise.all([
       ctx.db
         .from("tasks")
-        .select("id, section, title, url, reward, verify_type, icon_url, sort_order")
+        .select("id, section, title, url, reward, verify_type, icon_url, sort_order, max_completions")
         .eq("active", true)
         .order("sort_order", { ascending: true }),
       ctx.db.from("task_completions").select("task_key").eq("user_id", u.id),
     ]);
 
     const doneKeys = new Set((done.data ?? []).map((r) => r.task_key as string));
+    const rows = list.data ?? [];
+    const counts = await Promise.all(
+      rows.map(async (t) => {
+        const r = await ctx.db
+          .from("task_completions")
+          .select("task_key", { count: "exact", head: true })
+          .eq("task_key", `task:${t.id as string}`);
+        return r.count ?? 0;
+      }),
+    );
     return {
-      tasks: (list.data ?? []).map((t) => ({
+      tasks: rows
+        .map((t, i) => ({ t, count: counts[i] ?? 0, cap: Number(t.max_completions ?? 0) }))
+        // Tasks that reached their completion limit disappear for users who have not done them.
+        .filter(({ t, count, cap }) => !(cap > 0 && count >= cap) || doneKeys.has(`task:${t.id as string}`))
+        .map(({ t, count, cap }) => ({
+        completions: count,
+        maxCompletions: cap,
         id: t.id as string,
         section: (t.section as string) === "partner" ? "partner" : "main",
         title: t.title as string,
@@ -1110,10 +1126,18 @@ export const claimTask = createServerFn({ method: "POST" })
 
     const { data: task } = await ctx.db
       .from("tasks")
-      .select("id, title, reward, verify_type, chat_username, active")
+      .select("id, title, reward, verify_type, chat_username, active, max_completions")
       .eq("id", data.taskId)
       .maybeSingle();
     if (!task || !task.active) throw new Error("This task is no longer available");
+    const cap = Number(task.max_completions ?? 0);
+    if (cap > 0) {
+      const c = await ctx.db
+        .from("task_completions")
+        .select("task_key", { count: "exact", head: true })
+        .eq("task_key", `task:${task.id as string}`);
+      if ((c.count ?? 0) >= cap) throw new Error("This task is full — no slots left");
+    }
 
     if (task.verify_type === "channel" && task.chat_username) {
       const { isChatMember } = await import("./telegram.server");
