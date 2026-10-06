@@ -12,7 +12,7 @@ import {
 import { getPayoutProof } from "@/lib/farm.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
-import { t, useLang } from "@/lib/i18n";
+import { LANGS, t, useLang } from "@/lib/i18n";
 import { LanguageGrid } from "@/components/LanguagePicker";
 import { COMMUNITY_URL, MINI_APP_URL, PAYMENT_URL, SITE_URL } from "@/lib/constants";
 import { openLink } from "@/lib/telegram-client";
