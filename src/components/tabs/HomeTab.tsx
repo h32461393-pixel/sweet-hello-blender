@@ -64,7 +64,7 @@ export function HomeTab({ onTab }: { onTab?: (t: TabKey) => void }) {
     const left = Math.max(0, endsAt - Date.now());
     return { running: left > 0, claimable: left === 0, left, progress: total ? 1 - left / total : 0 };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, Date.now() / 1000 | 0]);
+  }, [data, Math.floor(Date.now() / 1000)]);
 
   if (isLoading) {
     return (
