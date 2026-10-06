@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import logo from "@/assets/fox-logo.png.asset.json";
 import { assetUrl } from "@/lib/constants";
+import { FarmBackground } from "@/components/farm/FarmBackground";
 
 type Phase = "loading" | "error" | "done";
 
@@ -72,7 +73,9 @@ export function Splash({ onReady, run }: { onReady: () => void; run?: () => Prom
 
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background px-6 text-center">
+    <div className="relative flex min-h-screen flex-col items-center justify-center px-6 text-center">
+      <FarmBackground />
+      <div className="relative z-10 flex w-full flex-col items-center">
       <img
         src={assetUrl(logo.url)}
         alt="Fox Farm"
@@ -103,6 +106,7 @@ export function Splash({ onReady, run }: { onReady: () => void; run?: () => Prom
           <p className="mt-3 text-sm font-medium text-muted-foreground">{message}</p>
         </div>
       )}
+      </div>
     </div>
   );
 }

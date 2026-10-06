@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { BadgeCheck, Coins, ExternalLink, Gift, Moon, Pickaxe, Send, Sun, Ticket, Wallet } from "lucide-react";
+import { BadgeCheck, Coins, ExternalLink, Gift, HelpCircle, Moon, Pickaxe, Send, Sun, Ticket, Wallet } from "lucide-react";
+import { MiningScene } from "@/components/farm/MiningScene";
+import { openFarmGuide } from "@/components/farm/FarmGuide";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -54,13 +56,15 @@ export function HomeTab({ onTab }: { onTab?: (t: TabKey) => void }) {
   const [codeValue, setCodeValue] = useState("");
 
   const miningState = useMemo(() => {
-    if (!data) return { running: false, claimable: false, left: 0 };
+    if (!data) return { running: false, claimable: false, left: 0, progress: 0 };
     const startedAt = data.user.miningStartedAt ? new Date(data.user.miningStartedAt).getTime() : null;
-    if (!startedAt || data.user.miningClaimed) return { running: false, claimable: false, left: 0 };
-    const endsAt = startedAt + data.mining.durationMinutes * 60_000;
+    if (!startedAt || data.user.miningClaimed) return { running: false, claimable: false, left: 0, progress: 0 };
+    const total = data.mining.durationMinutes * 60_000;
+    const endsAt = startedAt + total;
     const left = Math.max(0, endsAt - Date.now());
-    return { running: left > 0, claimable: left === 0, left };
-  }, [data]);
+    return { running: left > 0, claimable: left === 0, left, progress: total ? 1 - left / total : 0 };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, Math.floor(Date.now() / 1000)]);
 
   if (isLoading) {
     return (
@@ -94,7 +98,7 @@ export function HomeTab({ onTab }: { onTab?: (t: TabKey) => void }) {
   return (
     <div className="space-y-4">
       {/* user header */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 rounded-3xl border border-border bg-card/85 p-2.5 shadow-sm backdrop-blur">
         <img src={u.photoUrl ?? assetUrl(logo.url)} alt="" className="h-11 w-11 shrink-0 rounded-full object-cover" />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-bold">Hi, {u.firstName ?? "farmer"} 👋</p>
@@ -102,6 +106,17 @@ export function HomeTab({ onTab }: { onTab?: (t: TabKey) => void }) {
             {u.username ? `@${u.username}` : `ID ${u.telegramId}`}
           </p>
         </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          onClick={openFarmGuide}
+          aria-label="Open the farm guide"
+          title="Farm guide"
+          className="h-10 w-10 shrink-0 rounded-full bg-card"
+        >
+          <HelpCircle />
+        </Button>
         <Button
           type="button"
           variant="outline"
@@ -117,7 +132,9 @@ export function HomeTab({ onTab }: { onTab?: (t: TabKey) => void }) {
       </div>
 
       {/* balance */}
-      <div className="rounded-3xl bg-gradient-to-br from-primary to-accent p-5 text-primary-foreground shadow-lg">
+      <div className="relative overflow-hidden rounded-3xl border-4 border-wood/70 bg-gradient-to-br from-barn via-primary to-accent p-5 text-primary-foreground shadow-xl">
+        <div className="animate-shine pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-primary-foreground/15 to-transparent" />
+        <span className="animate-coin-bounce absolute right-4 top-4 grid h-12 w-12 place-items-center rounded-full border-4 border-coin-edge bg-coin text-lg font-black text-accent-foreground shadow-lg">F</span>
         <p className="text-xs font-semibold opacity-90">🌾 FOX Balance</p>
         <p className="mt-1 text-4xl font-black tabular-nums">{u.balance.toLocaleString()}</p>
         <p className="mt-1 text-xs opacity-90">
@@ -136,15 +153,12 @@ export function HomeTab({ onTab }: { onTab?: (t: TabKey) => void }) {
           </span>
         </div>
 
-        <div className="my-4 grid place-items-center">
-          <div
-            className={`grid h-28 w-28 place-items-center rounded-full border-4 ${miningState.running ? "animate-pulse border-primary" : "border-muted"}`}
-          >
-            <span className="text-3xl">
-              {miningState.running ? "⛏️" : miningState.claimable ? "🎉" : "🦊"}
-            </span>
-          </div>
-          <p className="mt-2 text-sm font-semibold tabular-nums">
+        <div className="my-4">
+          <MiningScene
+            mode={miningState.running ? "running" : miningState.claimable ? "ready" : "idle"}
+            progress={miningState.progress}
+          />
+          <p className="mt-2 text-center text-sm font-semibold tabular-nums">
             {miningState.running
               ? fmt(miningState.left)
               : miningState.claimable
@@ -168,7 +182,7 @@ export function HomeTab({ onTab }: { onTab?: (t: TabKey) => void }) {
                 onError: (e) => toast.error(friendlyError(e)),
               });
             }}
-            className="w-full rounded-2xl bg-usdt py-3 font-bold text-usdt-foreground disabled:opacity-50 active:scale-[0.98]"
+            className="animate-glow w-full rounded-2xl bg-usdt py-3 font-bold text-usdt-foreground disabled:opacity-50 active:scale-[0.98]"
           >
             {claim.isPending ? "Claiming…" : `Claim ${data.mining.reward} FOX`}
           </button>

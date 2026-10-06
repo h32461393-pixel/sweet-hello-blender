@@ -58,3 +58,9 @@
 - [x] Admin Users split Active / Suspended; better Overview with online users
 - [x] Broadcast to all users + community channel, HTML, buttons, links, image
 - [x] Partner channels admin: add, bot-admin check, post (HTML+image, refer button), link edit, delete
+
+## Oct 6 request — Farm design
+- [x] Animated farm background (sky, sun/moon, clouds, birds/stars, hills, barn, grass) in light + dark
+- [x] Mining scene: fox digs with pickaxe, FOX coins fly up, progress bar; coin pile when ready; sleeping fox when idle
+- [x] First-time step-by-step guide (replay with the ? button on Home)
+- [x] Premium balance card, wooden nav, lightweight CSS-only animations (respect reduced motion)
