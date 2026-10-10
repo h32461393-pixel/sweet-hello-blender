@@ -535,7 +535,8 @@ export const claimAdView = createServerFn({ method: "POST" })
     // Tap-based reward percentage.
     let percent = 100;
     if (data.source === "adsgram") percent = [25, 50, 75][data.taps] ?? 100;
-    else if (data.source === "adsgram_int") percent = data.taps >= 1 || data.ms >= 5000 ? 100 : 50;
+    else if (data.source === "adsgram_int")
+      percent = data.taps >= 1 ? 100 : data.ms >= 15000 ? 75 : data.ms >= 10000 ? 50 : 25;
     else if (data.source !== "site" && data.taps < 1) throw new Error("Tap the ad at least once to earn");
     const net = baseNet ? { ...baseNet, reward: Math.max(1, Math.round((baseNet.reward * percent) / 100)) } : null;
 

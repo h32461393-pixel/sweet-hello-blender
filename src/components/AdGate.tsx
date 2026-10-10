@@ -23,9 +23,11 @@ const useStore = () => useSyncExternalStore(subscribe, () => state, () => state)
 
 let pending: { pick: () => AdNetwork; resolve: (r: AdResult) => void; reject: (e: Error) => void } | null = null;
 export const AD_COOLDOWN_MS = 5000;
+let intro: AdNetwork | null = null;
 
 async function attempt() {
   if (!pending) return;
+  intro = null;
   set({ phase: "loading" });
   try {
     const r = await showAd(pending.pick());
@@ -40,15 +42,31 @@ async function attempt() {
 
 /**
  * Blocks the whole app until an ad is fully watched. Resolves with the number
- * of ad taps detected and how long the ad was open.
+ * of ad taps detected and how long the ad was open. Adsgram ads show a short
+ * tap tutorial first.
  */
 export function requireAd(net: AdNetwork | (() => AdNetwork)): Promise<AdResult> {
   if (pending) return Promise.reject(new Error("An ad is already open"));
   return new Promise<AdResult>((resolve, reject) => {
-    pending = { pick: typeof net === "function" ? net : () => net, resolve, reject };
-    void attempt();
+    const chosen = typeof net === "function" ? net() : net;
+    pending = { pick: () => chosen, resolve, reject };
+    if (chosen === "adsgram" || chosen === "adsgram_int") {
+      intro = chosen;
+      set({ phase: "intro" });
+    } else void attempt();
   });
 }
+
+const RULES: Record<string, { need: string; rows: [string, string][] }> = {
+  adsgram: {
+    need: "Tap the ad 3 times for 100%",
+    rows: [["No tap", "25%"], ["1 tap", "50%"], ["2 taps", "75%"], ["3+ taps", "100%"]],
+  },
+  adsgram_int: {
+    need: "Tap the ad 1 time for 100%",
+    rows: [["Closed before 10s", "25%"], ["10–15s, no tap", "50%"], ["Watched 15s+", "75%"], ["1 tap", "100%"]],
+  },
+};
 
 export function showRewardPopup(amount: number, label: string, taps?: number, percent?: number) {
   set({ reward: { amount, label, taps, percent } });
