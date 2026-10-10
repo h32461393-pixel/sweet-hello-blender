@@ -694,6 +694,16 @@ async function tigorixProgress(tgId: number): Promise<TigorixProgress> {
     return { started: true, ads: Math.max(adsgram, total), linked: true, reason: "ok" };
   } catch (e) {
     console.error("tigorix fetch threw", e);
+    const m = String((e as Error)?.message ?? e);
+    if (/Failed to parse URL|Invalid URL/i.test(m)) {
+      return { started: false, ads: 0, linked: false, reason: "Tigorix DB URL is not a valid address — it must start with https:// (copy the whole URL again)" };
+    }
+    if (/ENOTFOUND|getaddrinfo|EAI_AGAIN|dns/i.test(m)) {
+      return { started: false, ads: 0, linked: false, reason: "Tigorix DB URL host not found — the URL is misspelled or the Tigorix project is paused" };
+    }
+    if (/ECONNREFUSED|ETIMEDOUT|ECONNRESET|terminated|fetch failed|network/i.test(m)) {
+      return { started: false, ads: 0, linked: false, reason: "Tigorix DB refused the connection — the Tigorix project may be paused or the URL is wrong" };
+    }
     return { started: false, ads: 0, linked: false, reason: "Tigorix DB unreachable (check URL)" };
   }
 }
