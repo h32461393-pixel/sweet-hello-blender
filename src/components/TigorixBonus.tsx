@@ -1,6 +1,6 @@
 import { toast } from "sonner";
 import { CheckCircle2, Circle, Gift, Loader2, RefreshCw, ExternalLink } from "lucide-react";
-import logo from "@/assets/fox-logo.png.asset.json";
+import logo from "@/assets/tigorix-logo.png.asset.json";
 import { assetUrl } from "@/lib/constants";
 import { useTigorixBonus, useClaimTigorixBonus, friendlyError } from "@/hooks/useFarm";
 import { showRewardPopup } from "@/components/AdGate";
@@ -8,7 +8,6 @@ import { openLink } from "@/lib/telegram-client";
 import { cn } from "@/lib/utils";
 
 export const TIGORIX_URL = "https://t.me/Tigorixbot/play";
-/** Replace with the real Tigorix logo URL once provided. */
 const TIGORIX_LOGO = assetUrl(logo.url);
 
 function Bar({ label, value, target }: { label: string; value: number; target: number }) {
