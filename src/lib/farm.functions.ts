@@ -128,7 +128,7 @@ export const syncUser = createServerFn({ method: "POST" })
           }
         }
         if (data.device && !patch["suspended"]) {
-          const twin = await db.from("app_users").select("id").eq("device_hash", data.device).neq("id", ex.id).limit(1);
+          const twin = await db.from("app_users").select("id").eq("device_hash", data.device).neq("id", ex.id).lt("created_at", ex.created_at).limit(1);
           if ((twin.data?.length ?? 0) > 0 && ex.device_hash !== data.device) {
             patch["suspended"] = true;
             patch["suspend_reason"] = "Multiple accounts on the same device are not allowed.";
@@ -269,6 +269,14 @@ export const startMining = createServerFn({ method: "POST" })
     const ctx = await loadCtx(data.initData);
     await rateLimit(ctx.db, "mine_start", ctx.tg.id, 10, 60);
     const u = await getUserRow(ctx);
+    const dayStart = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00Z").toISOString();
+    const mined = await ctx.db
+      .from("transactions")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", u.id)
+      .eq("kind", "mining")
+      .gte("created_at", dayStart);
+    if ((mined.count ?? 0) >= 10) throw new Error("Daily mining limit reached (10 per day). Come back after 00:00 UTC.");
     const { error } = await ctx.db.rpc("start_mining_v1", { _user_id: u.id });
     if (error) throw new Error(rpcMessage(error, "Mining is already running"));
     return { ok: true };
@@ -951,7 +959,8 @@ export const verifyWithdrawUser = createServerFn({ method: "POST" })
     if (ledger !== Number(u.balance ?? 0)) reasons.push("Balance does not match your activity history.");
     // 2. Same device used by other accounts.
     if (u.device_hash) {
-      const { count } = await ctx.db.from("app_users").select("id", { count: "exact", head: true }).eq("device_hash", u.device_hash).neq("id", u.id);
+      const { count } = await ctx.db.from("app_users").select("id", { count: "exact", head: true }).eq("device_hash", u.device_hash).neq("id", u.id).lt("created_at", u.created_at);
+      // Only accounts created AFTER the first one on this device are flagged; the original account stays safe.
       if ((count ?? 0) > 0) reasons.push("Multiple accounts on the same device are not allowed.");
     }
     // 3. Shared network detection — flag for review instead of auto-suspending.
@@ -960,7 +969,9 @@ if (u.signup_ip) {
   const { count } = await ctx.db
     .from("app_users")
     .select("id", { count: "exact", head: true })
-    .eq("signup_ip", u.signup_ip);
+    .eq("signup_ip", u.signup_ip)
+    .neq("id", u.id)
+    .lt("created_at", u.created_at);
 
   if ((count ?? 0) >= 4) {
     await ctx.db
