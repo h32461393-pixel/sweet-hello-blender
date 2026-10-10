@@ -196,7 +196,7 @@ export function HomeTab({ onTab }: { onTab?: (t: TabKey) => void }) {
           </button>
         ) : (
           <button
-            disabled={miningState.running || start.isPending}
+            disabled={miningState.running || start.isPending || data.mining.usedToday >= data.mining.dailyLimit}
             onClick={async () => {
               haptic();
               try {
@@ -211,7 +211,7 @@ export function HomeTab({ onTab }: { onTab?: (t: TabKey) => void }) {
             }}
             className="w-full rounded-2xl bg-primary py-3 font-bold text-primary-foreground disabled:opacity-50 active:scale-[0.98]"
           >
-            {miningState.running ? "Mining in progress…" : start.isPending ? "Starting…" : "Start mining"}
+            {miningState.running ? "Mining in progress…" : data.mining.usedToday >= data.mining.dailyLimit ? "Daily limit reached · back at 00:00 UTC" : start.isPending ? "Starting…" : "Start mining"}
           </button>
         )}
         <div className="mt-3" />

@@ -15,6 +15,7 @@ import { syncUser, getAppStatus } from "@/lib/farm.functions";
 import { useQuery } from "@tanstack/react-query";
 import { ChannelGate } from "@/components/ChannelGate";
 import { FarmGuide } from "@/components/farm/FarmGuide";
+import { TigorixBonusPopup } from "@/components/TigorixBonus";
 import { LanguagePicker } from "@/components/LanguagePicker";
 import { getInitData, getWebApp } from "@/lib/telegram-client";
 import { MINI_APP_URL, BOT_USERNAME, assetUrl } from "@/lib/constants";
@@ -92,6 +93,7 @@ function Index() {
       <AdOverlay />
       <FarmGuide />
       <LanguagePicker />
+      <TigorixBonusPopup />
       <Toaster position="top-center" />
       </MaintenanceGate>
     </ChannelGate>
