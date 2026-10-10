@@ -773,7 +773,7 @@ export const getPayoutProof = createServerFn({ method: "GET" }).handler(async ()
     db.from("withdrawals").select("net_usd, status"),
     db
       .from("app_users")
-      .select("username, first_name, total_earned")
+      .select("username, first_name, total_earned, photo_url")
       .eq("suspended", false)
       .order("total_earned", { ascending: false })
       .limit(20),
@@ -808,8 +808,22 @@ export const getPayoutProof = createServerFn({ method: "GET" }).handler(async ()
     leaderboard: (top.data ?? []).map((u, i) => ({
       rank: i + 1,
       user: mask(u),
+      photo: (u.photo_url as string | null) ?? null,
       earned: Number(u.total_earned ?? 0),
     })),
+    referralBoard: await (async () => {
+      const { data: refs } = await db.from("referrals").select("referrer_id").eq("fake", false).limit(20000);
+      const counts = new Map<string, number>();
+      for (const r of refs ?? []) counts.set(r.referrer_id as string, (counts.get(r.referrer_id as string) ?? 0) + 1);
+      const topIds = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 30).map(([id]) => id);
+      if (!topIds.length) return [] as { rank: number; user: string; photo: string | null; count: number }[];
+      const { data: us } = await db.from("app_users").select("id, username, first_name, photo_url, suspended").in("id", topIds);
+      const m = new Map((us ?? []).filter((u) => !u.suspended).map((u) => [u.id, u]));
+      return topIds
+        .filter((id) => m.has(id))
+        .slice(0, 20)
+        .map((id, i) => ({ rank: i + 1, user: mask(m.get(id)!), photo: (m.get(id)!.photo_url as string | null) ?? null, count: counts.get(id)! }));
+    })(),
   };
 });
 
