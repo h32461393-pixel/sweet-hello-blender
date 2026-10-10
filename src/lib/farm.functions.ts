@@ -643,30 +643,46 @@ async function tigorixConfig(db: Ctx["db"]): Promise<TigorixCfg> {
   };
 }
 
-async function tigorixProgress(tgId: number): Promise<{ started: boolean; ads: number; linked: boolean }> {
-  const url = process.env["TIGORIX_SUPABASE_URL"];
-  const key = process.env["TIGORIX_SERVICE_KEY"];
-  // linked=false means this site cannot reach the Tigorix data at all —
-  // usually the two Tigorix settings are missing on the deployed host.
-  if (!url || !key) return { started: false, ads: 0, linked: false };
+function envFirst(...names: string[]): string {
+  for (const n of names) {
+    const v = process.env[n];
+    // Strip quotes/whitespace/newlines that often sneak in when pasting into a host dashboard.
+    if (v && v.trim()) return v.trim().replace(/^["']|["']$/g, "").trim();
+  }
+  return "";
+}
+
+type TigorixProgress = { started: boolean; ads: number; linked: boolean; reason: string };
+async function tigorixProgress(tgId: number): Promise<TigorixProgress> {
+  const url = envFirst("TIGORIX_SUPABASE_URL", "TIGORIX_URL", "TIGORIX_DB_URL").replace(/\/+$/, "").replace(/\/rest\/v1$/, "");
+  const key = envFirst("TIGORIX_SERVICE_KEY", "TIGORIX_SERVICE_ROLE_KEY", "TIGORIX_SUPABASE_SERVICE_ROLE_KEY", "TIGORIX_SUPABASE_KEY", "TIGORIX_KEY");
+  // linked=false means this site cannot reach the Tigorix data at all.
+  if (!url) return { started: false, ads: 0, linked: false, reason: "TIGORIX_SUPABASE_URL missing" };
+  if (!key) return { started: false, ads: 0, linked: false, reason: "TIGORIX_SERVICE_KEY missing" };
   const headers: Record<string, string> = { apikey: key };
   if (!key.startsWith("sb_")) headers["Authorization"] = `Bearer ${key}`;
   try {
-    const r = await fetch(`${url}/rest/v1/docs?collection=eq.users&id=eq.${encodeURIComponent(String(tgId))}&select=data`, { headers });
-    if (!r.ok) return { started: false, ads: 0, linked: false };
+    // Tigorix stores each player under their Telegram ID — match exactly that user.
+    const r = await fetch(`${url}/rest/v1/docs?collection=eq.users&id=eq.${encodeURIComponent(String(tgId))}&select=data`, { headers, cache: "no-store" });
+    if (!r.ok) {
+      const body = (await r.text().catch(() => "")).slice(0, 120);
+      console.error("tigorix fetch failed", r.status, body);
+      return { started: false, ads: 0, linked: false, reason: `Tigorix DB error ${r.status}` };
+    }
     const rows = (await r.json()) as { data?: Record<string, unknown> }[];
     const d = rows[0]?.data;
     // Connection works, this user simply has no Tigorix row yet.
-    if (!d) return { started: false, ads: 0, linked: true };
+    if (!d) return { started: false, ads: 0, linked: true, reason: "not_started" };
     const today = todayUTC();
     const n = (cnt: string, day: string) => (String(d[day] ?? "") === today ? Number(d[cnt] ?? 0) || 0 : 0);
     // Count every ad watched in Tigorix today: it keeps both a total counter
     // and per-network counters, so use whichever it recorded.
     const adsgram = n("rewardAdsToday", "rewardAdsDayKey") + n("intAdsToday", "intAdsDayKey");
     const total = n("adsToday", "adsDayKey");
-    return { started: true, ads: Math.max(adsgram, total), linked: true };
-  } catch {
-    return { started: false, ads: 0, linked: false };
+    return { started: true, ads: Math.max(adsgram, total), linked: true, reason: "ok" };
+  } catch (e) {
+    console.error("tigorix fetch threw", e);
+    return { started: false, ads: 0, linked: false, reason: "Tigorix DB unreachable (check URL)" };
   }
 }
 
@@ -694,6 +710,7 @@ async function tigorixState(ctx: Ctx) {
     reward: cfg.reward,
     started: tx.started,
     linked: tx.linked,
+    reason: tx.reason,
     foxAds,
     foxTarget: cfg.foxTarget,
     tigorixAds: tx.ads,
