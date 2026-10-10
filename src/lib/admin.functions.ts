@@ -1,7 +1,7 @@
 import { dbHint } from "./db-errors";
 import { createServerFn } from "@tanstack/react-start";
 import { rateLimit, assertAdmin } from "./security.server";
-import { MINI_APP_URL, PAYMENT_URL, ADMIN_REFER_LINK, BANNER_URL } from "./constants";
+import { MINI_APP_URL, PAYMENT_URL, ADMIN_REFER_LINK, BANNER_URL, PAYOUT_PHOTO_URL } from "./constants";
 
 type Auth = { initData: string; username: string; password: string };
 
@@ -278,7 +278,7 @@ export const adminProcessWithdrawal = createServerFn({ method: "POST" })
       const { sendPhoto } = await import("./telegram.server");
       const res = await sendPhoto(
         channel,
-        BANNER_URL,
+        PAYOUT_PHOTO_URL,
         `🎉💸 <b>NEW PAYMENT SENT!</b> 💸🎉\n━━━━━━━━━━━━━━━\n👤 <b>User:</b> ${name}\n🪙 <b>Withdrawn:</b> ${Number(w?.amount_tokens ?? 0).toLocaleString()} FOX\n💵 <b>Received:</b> $${Number(w?.net_usd ?? 0).toFixed(4)} USDT\n🌐 <b>Network:</b> BEP-20 (BNB Smart Chain)\n📬 <b>Wallet:</b> <code>${short(String(w?.address ?? ""))}</code>\n🕒 <b>Date:</b> ${date} UTC\n✅ <b>Status:</b> Paid\n━━━━━━━━━━━━━━━\n🦊 <b>Fox Farm pays every day!</b> 🚀\n👇 Start farming now 👇`,
         scan
           ? [
