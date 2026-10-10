@@ -64,3 +64,8 @@
 - [x] Mining scene: fox digs with pickaxe, FOX coins fly up, progress bar; coin pile when ready; sleeping fox when idle
 - [x] First-time step-by-step guide (replay with the ? button on Home)
 - [x] Premium balance card, wooden nav, lightweight CSS-only animations (respect reduced motion)
+
+## Oct 10 request
+- [ ] Tap tutorial pop-up must show before the auto (Home) interstitial opens
+- [ ] Tigorix partner bonus: ads watched inside Tigorix must count toward the progress
+
