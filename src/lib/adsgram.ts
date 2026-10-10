@@ -73,7 +73,82 @@ function withTimeout<T>(p: Promise<T>, ms = 60_000): Promise<T> {
   return Promise.race([p, new Promise<T>((_, rej) => setTimeout(() => rej(new Error("No ad available")), ms))]);
 }
 
-export async function showAd(net: AdNetwork): Promise<void> {
+/* ------------------------------------------------------------ tap tracking
+ * An "ad tap" = the ad opened a link / bot / mini app / channel, so the user
+ * left the app. blur, visibilitychange, Telegram deactivated and link opens
+ * all fire for the same tap; we count only the first one until the user is
+ * back (focus / visible / activated) and keep a 1.5s guard on top.
+ */
+let tracking = false;
+let away = false;
+let taps = 0;
+let lastTap = 0;
+let installed = false;
+
+function markAway() {
+  if (!tracking || away) return;
+  const now = Date.now();
+  away = true;
+  if (now - lastTap < 1500) return;
+  lastTap = now;
+  taps += 1;
+}
+function markBack() {
+  away = false;
+}
+
+type TgWA = {
+  onEvent?: (e: string, cb: () => void) => void;
+  openLink?: (u: string, o?: unknown) => void;
+  openTelegramLink?: (u: string) => void;
+};
+function installTracking() {
+  if (installed || typeof window === "undefined") return;
+  installed = true;
+  window.addEventListener("blur", markAway);
+  window.addEventListener("focus", markBack);
+  document.addEventListener("visibilitychange", () => (document.hidden ? markAway() : markBack()));
+  const origOpen = window.open.bind(window);
+  window.open = ((...a: Parameters<typeof window.open>) => {
+    markAway();
+    return origOpen(...a);
+  }) as typeof window.open;
+  const wa = (window as unknown as { Telegram?: { WebApp?: TgWA } }).Telegram?.WebApp;
+  if (wa) {
+    wa.onEvent?.("deactivated", markAway);
+    wa.onEvent?.("activated", markBack);
+    for (const k of ["openLink", "openTelegramLink"] as const) {
+      const orig = wa[k];
+      if (typeof orig === "function") {
+        wa[k] = ((...a: unknown[]) => {
+          markAway();
+          return (orig as (...x: unknown[]) => unknown).apply(wa, a);
+        }) as never;
+      }
+    }
+  }
+}
+
+export type AdResult = { taps: number; ms: number };
+
+export async function showAd(net: AdNetwork): Promise<AdResult> {
+  installTracking();
+  tracking = true;
+  away = false;
+  taps = 0;
+  lastTap = 0;
+  const start = Date.now();
+  try {
+    await showAdRaw(net);
+    // Give the "back to app" events a moment to settle.
+    await new Promise((r) => setTimeout(r, 300));
+    return { taps, ms: Date.now() - start };
+  } finally {
+    tracking = false;
+  }
+}
+
+async function showAdRaw(net: AdNetwork): Promise<void> {
   const w = window as unknown as W;
   switch (net) {
     case "adsgram":

@@ -8,6 +8,7 @@ import { useAdsState, useClaimAdView, friendlyError } from "@/hooks/useFarm";
 import { requireAd, showRewardPopup, useAdCooldown } from "@/components/AdGate";
 import type { AdNetwork } from "@/lib/adsgram";
 import { openLink } from "@/lib/telegram-client";
+import { TigorixBonus } from "@/components/TigorixBonus";
 
 
 const VISIT_SECONDS = 10;
@@ -44,9 +45,9 @@ export function AdsTab() {
     if (busy || cd.busy) return;
     setBusy(id);
     try {
-      await requireAd(id as AdNetwork);
-      const res = await claim.mutateAsync({ source: id as "adsgram" });
-      showRewardPopup(res.reward, label);
+      const ad = await requireAd(id as AdNetwork);
+      const res = await claim.mutateAsync({ source: id as "adsgram", taps: ad.taps, ms: ad.ms });
+      showRewardPopup(res.reward, label, res.taps ?? ad.taps, res.percent);
     } catch (e) {
       toast.error(friendlyError(e));
     } finally {
@@ -104,6 +105,8 @@ export function AdsTab() {
         </div>
       )}
 
+      <TigorixBonus />
+
       <div className="grid grid-cols-2 gap-1 rounded-2xl bg-secondary p-1">
         {(["ads", "sites"] as const).map((s) => (
           <button
@@ -156,7 +159,7 @@ export function AdsTab() {
             );
           })}
           <GuideCard title="How rewards are verified">
-            A reward is added only after the ad network confirms a finished ad. No ad = no reward. Daily limits reset at 00:00 UTC.
+            Adsgram Reward: 0 taps 25%, 1 tap 50%, 2 taps 75%, 3+ taps 100%. Adsgram Interstitial: closed before 5s 50%, tapped or watched 100%. Monetag, GigaPub, Monetix: tap the ad at least once. Limits reset at 00:00 UTC.
           </GuideCard>
         </div>
       ) : (

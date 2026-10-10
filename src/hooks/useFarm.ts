@@ -18,6 +18,8 @@ import {
   getTasks,
   claimTask,
   claimReferralRewards,
+  getTigorixBonus,
+  claimTigorixBonus,
 } from "@/lib/farm.functions";
 import { getInitData } from "@/lib/telegram-client";
 
@@ -84,11 +86,36 @@ export function useClaimAdView() {
     mutationFn: (args: {
       source: "adsgram" | "adsgram_int" | "monetag" | "gigapub" | "monetix" | "site";
       siteId?: string;
+      taps?: number;
+      ms?: number;
     }) =>
       fn({ data: { ...args, initData: getInitData() } }),
     onSettled: () => {
       qc.invalidateQueries({ queryKey: HOME_KEY });
       qc.invalidateQueries({ queryKey: ["ads-state"] });
+      qc.invalidateQueries({ queryKey: ["tigorix"] });
+    },
+  });
+}
+
+export function useTigorixBonus(enabled = true) {
+  const fn = useServerFn(getTigorixBonus);
+  return useQuery({
+    queryKey: ["tigorix"],
+    queryFn: () => fn({ data: { initData: getInitData() } }),
+    enabled,
+    retry: 1,
+  });
+}
+
+export function useClaimTigorixBonus() {
+  const qc = useQueryClient();
+  const fn = useServerFn(claimTigorixBonus);
+  return useMutation({
+    mutationFn: () => fn({ data: { initData: getInitData() } }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: HOME_KEY });
+      qc.invalidateQueries({ queryKey: ["tigorix"] });
     },
   });
 }

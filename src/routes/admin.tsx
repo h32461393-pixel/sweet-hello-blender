@@ -561,36 +561,41 @@ function Tasks({ creds }: { creds: Creds }) {
 function Ads({ creds }: { creds: Creds }) {
   const getFn = useServerFn(adminGetConfig);
   const setFn = useServerFn(adminSetConfig);
-  const [draft, setDraft] = useState<string | null>(null);
+  const [draft, setDraft] = useState<Record<string, unknown> | null>(null);
   const { data } = useQuery({
     queryKey: ["admin-ads"],
     queryFn: () => getFn({ data: { ...creds, key: "ads" } }),
   });
-  const value = draft ?? data?.json ?? "";
+  const base = (() => { try { return JSON.parse(data?.json ?? "{}") as Record<string, unknown>; } catch { return {}; } })();
+  const cfg = draft ?? base;
+  const nets = (cfg["networks"] ?? {}) as Record<string, Record<string, unknown>>;
+  const IDS = ["adsgram", "adsgram_int", "monetag", "gigapub", "monetix"];
+  const setNet = (id: string, k: string, v: string) =>
+    setDraft({ ...cfg, networks: { ...nets, [id]: { ...(nets[id] ?? {}), [k]: k === "label" || k === "logo" ? v : Number(v) } } });
   const save = useMutation({
-    mutationFn: () => setFn({ data: { ...creds, key: "ads", value: JSON.parse(value) } }),
-    onSuccess: () => toast.success("Ad settings saved"),
+    mutationFn: () => setFn({ data: { ...creds, key: "ads", value: cfg } }),
+    onSuccess: () => { toast.success("Ad settings saved"); setDraft(null); },
     onError: (e) => toast.error((e as Error).message),
   });
-
   return (
-    <Card>
-      <p className="mb-2 text-xs text-muted-foreground">
-        Rewards and daily limits per ad network. Change the numbers only.
-      </p>
-      <textarea
-        value={value}
-        onChange={(e) => setDraft(e.target.value)}
-        rows={14}
-        className="w-full rounded-xl border border-border bg-background p-2 font-mono text-[11px]"
-      />
-      <button
-        onClick={() => save.mutate()}
-        className="mt-2 w-full rounded-xl bg-primary py-2 text-sm font-black text-primary-foreground"
-      >
+    <div className="space-y-2">
+      {IDS.map((id) => {
+        const n = nets[id] ?? {};
+        return (
+          <Card key={id}>
+            <p className="mb-2 text-sm font-black">{String(n["label"] ?? id)}</p>
+            <div className="grid grid-cols-3 gap-2">
+              <Field label="Reward" type="number" value={String(n["reward"] ?? 40)} onChange={(v) => setNet(id, "reward", v)} />
+              <Field label="Daily cap" type="number" value={String(n["cap"] ?? 10)} onChange={(v) => setNet(id, "cap", v)} />
+              <Field label="Cooldown s" type="number" value={String(n["cooldown"] ?? 5)} onChange={(v) => setNet(id, "cooldown", v)} />
+            </div>
+          </Card>
+        );
+      })}
+      <button onClick={() => save.mutate()} className="w-full rounded-xl bg-primary py-2 text-sm font-black text-primary-foreground">
         Save ad settings
       </button>
-    </Card>
+    </div>
   );
 }
 
@@ -813,12 +818,15 @@ function Settings({ creds }: { creds: Creds }) {
   const qc = useQueryClient();
   const app = useQuery({ queryKey: ["admin-cfg-app"], queryFn: () => getFn({ data: { ...creds, key: "app" } }) });
   const wd = useQuery({ queryKey: ["admin-cfg-wd"], queryFn: () => getFn({ data: { ...creds, key: "withdraw" } }) });
+  const tg = useQuery({ queryKey: ["admin-cfg-tg"], queryFn: () => getFn({ data: { ...creds, key: "tigorix" } }) });
+  const [tD, setTD] = useState<Record<string, unknown> | null>(null);
   const parse = (j?: string) => { try { return JSON.parse(j ?? "{}") as Record<string, unknown>; } catch { return {}; } };
   const a = parse(app.data?.json);
   const w = parse(wd.data?.json);
   const [aD, setAD] = useState<Record<string, unknown> | null>(null);
   const [wD, setWD] = useState<Record<string, unknown> | null>(null);
   const av = aD ?? a;
+  const tv = tD ?? parse(tg.data?.json);
   const wv = wD ?? w;
   const save = useMutation({
     mutationFn: async () => {
@@ -826,6 +834,11 @@ function Settings({ creds }: { creds: Creds }) {
       const nums: Record<string, number> = {};
       for (const [k, v] of Object.entries(wv)) if (v !== "" && Number.isFinite(Number(v))) nums[k] = Number(v);
       await setFn({ data: { ...creds, key: "withdraw", value: nums } });
+      await setFn({ data: { ...creds, key: "tigorix", value: {
+        enabled: tv["enabled"] === undefined ? true : tv["enabled"] === true,
+        reward: Number(tv["reward"] ?? 1000), fox_target: Number(tv["fox_target"] ?? 20), tigorix_target: Number(tv["tigorix_target"] ?? 15),
+      } } });
+      setTD(null); qc.invalidateQueries({ queryKey: ["admin-cfg-tg"] });
     },
     onSuccess: () => { toast.success("Settings saved — live in the app"); setAD(null); setWD(null); qc.invalidateQueries({ queryKey: ["admin-cfg-app"] }); qc.invalidateQueries({ queryKey: ["admin-cfg-wd"] }); },
     onError: (e) => toast.error((e as Error).message),
@@ -863,6 +876,18 @@ function Settings({ creds }: { creds: Creds }) {
           {num("tokens_per_usd", "FOX per $1", 100000)}
           {num("req_daily_ads", "Daily ads needed", 30)}
           {num("req_referrals", "Referrals needed", 2)}
+        </div>
+      </Card>
+      <Card>
+        <p className="mb-2 text-sm font-black">🤝 Tigorix partner bonus</p>
+        <label className="mb-2 flex items-center justify-between rounded-xl border border-border p-2 text-sm font-bold">
+          Bonus enabled
+          <input type="checkbox" checked={tv["enabled"] === undefined ? true : tv["enabled"] === true} onChange={(e) => setTD({ ...tv, enabled: e.target.checked })} />
+        </label>
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="Bonus FOX" type="number" value={String(tv["reward"] ?? 1000)} onChange={(v) => setTD({ ...tv, reward: v })} />
+          <Field label="Fox Farm Adsgram ads" type="number" value={String(tv["fox_target"] ?? 20)} onChange={(v) => setTD({ ...tv, fox_target: v })} />
+          <Field label="Tigorix Adsgram ads" type="number" value={String(tv["tigorix_target"] ?? 15)} onChange={(v) => setTD({ ...tv, tigorix_target: v })} />
         </div>
       </Card>
       <button onClick={() => save.mutate()} disabled={save.isPending} className="w-full rounded-xl bg-primary py-3 text-sm font-black text-primary-foreground disabled:opacity-50">
