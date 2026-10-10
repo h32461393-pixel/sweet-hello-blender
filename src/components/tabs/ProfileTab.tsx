@@ -581,13 +581,13 @@ function WithdrawHistory({
   );
 }
 
-type BoardRow = { rank: number; user: string; photo?: string | null; value: number };
+type BoardRow = { rank: number; user: string; photo?: string | null | undefined; value: number };
 
 function LeaderboardView({
   data,
   loading,
 }: {
-  data?: { leaderboard: { rank: number; user: string; photo?: string | null; earned: number }[]; referralBoard?: { rank: number; user: string; photo?: string | null; count: number }[] };
+  data?: { leaderboard: { rank: number; user: string; photo?: string | null | undefined; earned: number }[]; referralBoard?: { rank: number; user: string; photo?: string | null | undefined; count: number }[] | undefined } | undefined;
   loading: boolean;
 }) {
   const [kind, setKind] = useState<"earn" | "ref">("earn");
@@ -653,7 +653,7 @@ function LeaderboardView({
   );
 }
 
-function Avatar({ name, photo, big }: { name: string; photo?: string | null; big?: boolean }) {
+function Avatar({ name, photo, big }: { name: string; photo?: string | null | undefined; big?: boolean | undefined }) {
   const size = big ? "h-14 w-14 ring-4 ring-primary/40" : "h-10 w-10";
   return (
     <span className={`grid shrink-0 place-items-center overflow-hidden rounded-full bg-primary/15 font-black text-primary ${size}`}>

@@ -38,6 +38,6 @@ export const NETWORK_LOGOS: Record<string, string> = {
   adsgram: "https://www.google.com/s2/favicons?domain=adsgram.ai&sz=128",
   adsgram_int: "https://www.google.com/s2/favicons?domain=adsgram.ai&sz=128",
   monetag: "https://www.google.com/s2/favicons?domain=monetag.com&sz=128",
-  gigapub: "https://www.google.com/s2/favicons?domain=gigapub.tech&sz=128",
-  monetix: "https://www.google.com/s2/favicons?domain=monetixads.online&sz=128",
+  gigapub: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%237c3aed'/><stop offset='1' stop-color='%23ec4899'/></linearGradient></defs><rect width='64' height='64' rx='14' fill='url(%23g)'/><text x='32' y='42' font-family='Arial' font-weight='900' font-size='26' fill='white' text-anchor='middle'>GP</text></svg>",
+  monetix: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%230ea5e9'/><stop offset='1' stop-color='%2310b981'/></linearGradient></defs><rect width='64' height='64' rx='14' fill='url(%23g)'/><text x='32' y='42' font-family='Arial' font-weight='900' font-size='26' fill='white' text-anchor='middle'>MX</text></svg>",
 };
