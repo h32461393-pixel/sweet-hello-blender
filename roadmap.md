@@ -64,3 +64,8 @@
 - [x] Mining scene: fox digs with pickaxe, FOX coins fly up, progress bar; coin pile when ready; sleeping fox when idle
 - [x] First-time step-by-step guide (replay with the ? button on Home)
 - [x] Premium balance card, wooden nav, lightweight CSS-only animations (respect reduced motion)
+
+## Oct 10 request
+- [x] Tap tutorial pop-up must show before the auto (Home) interstitial opens — ad SDK scripts are no longer loaded at app open (they could auto-show an ad before the pop-up); each ad loads its own script when started
+- [x] Tigorix partner bonus: ads watched inside Tigorix count toward progress — counts every ad there today (total or per-network, whichever it recorded), refreshes on return and every 15s, and says so plainly when the site isn't connected to Tigorix
+

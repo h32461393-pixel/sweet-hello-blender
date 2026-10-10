@@ -643,23 +643,30 @@ async function tigorixConfig(db: Ctx["db"]): Promise<TigorixCfg> {
   };
 }
 
-async function tigorixProgress(tgId: number): Promise<{ started: boolean; ads: number }> {
+async function tigorixProgress(tgId: number): Promise<{ started: boolean; ads: number; linked: boolean }> {
   const url = process.env["TIGORIX_SUPABASE_URL"];
   const key = process.env["TIGORIX_SERVICE_KEY"];
-  if (!url || !key) return { started: false, ads: 0 };
+  // linked=false means this site cannot reach the Tigorix data at all —
+  // usually the two Tigorix settings are missing on the deployed host.
+  if (!url || !key) return { started: false, ads: 0, linked: false };
   const headers: Record<string, string> = { apikey: key };
   if (!key.startsWith("sb_")) headers["Authorization"] = `Bearer ${key}`;
   try {
     const r = await fetch(`${url}/rest/v1/docs?collection=eq.users&id=eq.${encodeURIComponent(String(tgId))}&select=data`, { headers });
-    if (!r.ok) return { started: false, ads: 0 };
+    if (!r.ok) return { started: false, ads: 0, linked: false };
     const rows = (await r.json()) as { data?: Record<string, unknown> }[];
     const d = rows[0]?.data;
-    if (!d) return { started: false, ads: 0 };
+    // Connection works, this user simply has no Tigorix row yet.
+    if (!d) return { started: false, ads: 0, linked: true };
     const today = todayUTC();
     const n = (cnt: string, day: string) => (String(d[day] ?? "") === today ? Number(d[cnt] ?? 0) || 0 : 0);
-    return { started: true, ads: n("rewardAdsToday", "rewardAdsDayKey") + n("intAdsToday", "intAdsDayKey") };
+    // Count every ad watched in Tigorix today: it keeps both a total counter
+    // and per-network counters, so use whichever it recorded.
+    const adsgram = n("rewardAdsToday", "rewardAdsDayKey") + n("intAdsToday", "intAdsDayKey");
+    const total = n("adsToday", "adsDayKey");
+    return { started: true, ads: Math.max(adsgram, total), linked: true };
   } catch {
-    return { started: false, ads: 0 };
+    return { started: false, ads: 0, linked: false };
   }
 }
 
@@ -684,6 +691,7 @@ async function tigorixState(ctx: Ctx) {
     enabled: cfg.enabled,
     reward: cfg.reward,
     started: tx.started,
+    linked: tx.linked,
     foxAds,
     foxTarget: cfg.foxTarget,
     tigorixAds: tx.ads,

@@ -46,10 +46,14 @@ function loadScript(key: keyof typeof SCRIPTS): Promise<void> {
   return p;
 }
 
-/** Preload all networks after the app opens (non-blocking). */
+/**
+ * Install tap tracking after the app opens. Ad SDK scripts are deliberately
+ * NOT loaded here: several networks auto-show an ad the moment their script
+ * loads, which opens an ad the user never asked for and skips the tap tutorial
+ * pop-up. Every show path in showAdRaw() loads its own script on demand.
+ */
 export function preloadAds() {
   installTracking();
-  for (const k of Object.keys(SCRIPTS)) loadScript(k as keyof typeof SCRIPTS).catch(() => {});
 }
 
 export function adsEnabled() {
