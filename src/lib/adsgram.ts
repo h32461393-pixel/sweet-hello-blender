@@ -48,6 +48,7 @@ function loadScript(key: keyof typeof SCRIPTS): Promise<void> {
 
 /** Preload all networks after the app opens (non-blocking). */
 export function preloadAds() {
+  installTracking();
   for (const k of Object.keys(SCRIPTS)) loadScript(k as keyof typeof SCRIPTS).catch(() => {});
 }
 
@@ -133,7 +134,7 @@ function installTracking() {
         if (tag === "A" && (el as HTMLAnchorElement).href) return markAway();
         if (tag === "BUTTON" || el.getAttribute?.("role") === "button") {
           const txt = (el.textContent ?? "").trim().toLowerCase();
-          if (!txt || /close|skip|✕|×|x$/.test(txt)) return;
+          if (!txt || /^(close|skip|✕|×|x)$|close|skip/.test(txt)) return;
           return markAway();
         }
       }
