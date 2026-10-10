@@ -197,6 +197,7 @@ export function HomeTab({ onTab }: { onTab?: (t: TabKey) => void }) {
             {miningState.running ? "Mining in progress…" : start.isPending ? "Starting…" : "Start mining"}
           </button>
         )}
+        <div className="mt-3" />
         <GuideCard title="How mining works">
           Start mining, wait 1 hour, then claim. Mining stops after each hour — you must claim
           before starting again. The bot messages you when it's ready.
@@ -294,6 +295,7 @@ export function HomeTab({ onTab }: { onTab?: (t: TabKey) => void }) {
           <Gift className="mr-2 inline h-4 w-4" />
           {data.daily.claimedToday ? "Claimed today — come back tomorrow" : `Claim day ${nextDay}`}
         </button>
+        <div className="mt-3" />
         <GuideCard title="Streak rules">
           Claim every day to move up the streak. Miss a day and the streak restarts at day 1. All
           daily resets happen at 00:00:00 UTC.
