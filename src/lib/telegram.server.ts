@@ -49,6 +49,9 @@ export function verifyInitData(initData: string): { user: TgUser; startParam: st
 
 const API = () => `https://api.telegram.org/bot${process.env["TELEGRAM_BOT_TOKEN"]}`;
 
+/** Last Telegram error description (for admin diagnostics). */
+export let lastTgError: string | null = null;
+
 export async function tgCall<T = unknown>(method: string, body: Record<string, unknown>): Promise<T | null> {
   try {
     if (!process.env["TELEGRAM_BOT_TOKEN"]) {
@@ -67,6 +70,7 @@ export async function tgCall<T = unknown>(method: string, body: Record<string, u
       description?: string;
     };
     if (!res.ok || !json.ok) {
+      lastTgError = json.description ?? `HTTP ${res.status}`;
       console.error(`[telegram] ${method} failed`, {
         status: res.status,
         errorCode: json.error_code,

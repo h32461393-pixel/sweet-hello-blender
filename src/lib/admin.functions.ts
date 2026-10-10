@@ -483,17 +483,33 @@ export const adminBroadcast = createServerFn({ method: "POST" })
     const ctx = await adminCtx(data);
     const first = data.offset === 0;
     if (first) await rateLimit(ctx.db, "admin_broadcast", ctx.adminId, 10, 3600);
-    const { sendMessage, sendPhoto } = await import("./telegram.server");
+    const tg = await import("./telegram.server");
+    const { sendMessage, sendPhoto, tgCall } = tg;
     const buttons: { text: string; url: string }[][] = [];
     if (data.buttonUrl) buttons.push([{ text: data.buttonText || "🔗 Open", url: data.buttonUrl }]);
     buttons.push([{ text: "🦊 Open Mini App", url: MINI_APP_URL }]);
-    // Photo captions are limited to 1024 chars: longer texts go as photo + separate message.
+    const plain = data.text.replace(/<[^>]+>/g, "");
+    const sendText = async (chat: number | string) =>
+      (await sendMessage(chat, data.text, buttons)) ??
+      // Broken HTML must never stop delivery: retry as plain text.
+      (await tgCall("sendMessage", {
+        chat_id: chat,
+        text: plain,
+        disable_web_page_preview: true,
+        reply_markup: { inline_keyboard: buttons },
+      }));
+    // If the image can't be fetched by Telegram, still deliver the text.
+    let photoOk = Boolean(data.imageUrl);
     const send = async (chat: number | string) => {
-      if (!data.imageUrl) return sendMessage(chat, data.text, buttons);
-      if (data.text.length <= 1024) return sendPhoto(chat, data.imageUrl, data.text, buttons);
-      const p = await sendPhoto(chat, data.imageUrl, "");
-      if (!p) return null;
-      return sendMessage(chat, data.text, buttons);
+      if (photoOk) {
+        const r =
+          data.text.length <= 1024
+            ? await sendPhoto(chat, data.imageUrl, data.text, buttons)
+            : (await sendPhoto(chat, data.imageUrl, "")) && (await sendText(chat));
+        if (r) return r;
+        if (/wrong|photo|file|url|image|IMAGE|PHOTO/i.test(tg.lastTgError ?? "")) photoOk = false;
+      }
+      return sendText(chat);
     };
     let channel: boolean | null = null;
     let payment: boolean | null = null;
