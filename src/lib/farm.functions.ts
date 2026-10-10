@@ -515,20 +515,28 @@ async function siteList(db: Ctx["db"]): Promise<SiteItem[]> {
 
 /** Called only after the provider confirms the view; the server re-checks everything. */
 export const claimAdView = createServerFn({ method: "POST" })
-  .inputValidator((d: { initData: string; source: AdSource | "site"; siteId?: string }) => {
+  .inputValidator((d: { initData: string; source: AdSource | "site"; siteId?: string; taps?: number; ms?: number }) => {
     if (typeof d?.initData !== "string" || !d.initData) throw new Error("Invalid session");
     const ok = d?.source === "site" || (AD_SOURCES as readonly string[]).includes(d?.source);
     if (!ok) throw new Error("Invalid request");
     const siteId = String(d?.siteId ?? "");
     if (d.source === "site" && !/^[a-z0-9_-]{1,40}$/i.test(siteId)) throw new Error("Invalid request");
-    return { initData: d.initData, source: d.source, siteId };
+    const taps = Math.max(0, Math.min(20, Math.trunc(Number(d?.taps ?? 0)) || 0));
+    const ms = Math.max(0, Math.min(600_000, Math.trunc(Number(d?.ms ?? 0)) || 0));
+    return { initData: d.initData, source: d.source, siteId, taps, ms };
   })
   .handler(async ({ data }) => {
     const ctx = await loadCtx(data.initData);
     await rateLimit(ctx.db, "ad_claim", ctx.tg.id, 80, 3600);
     const u = await getUserRow(ctx);
     const cfg = await adsConfig(ctx.db);
-    const net = data.source === "site" ? null : cfg.networks[data.source];
+    const baseNet = data.source === "site" ? null : cfg.networks[data.source];
+    // Tap-based reward percentage.
+    let percent = 100;
+    if (data.source === "adsgram") percent = [25, 50, 75][data.taps] ?? 100;
+    else if (data.source === "adsgram_int") percent = data.taps >= 1 || data.ms >= 5000 ? 100 : 50;
+    else if (data.source !== "site" && data.taps < 1) throw new Error("Tap the ad at least once to earn");
+    const net = baseNet ? { ...baseNet, reward: Math.max(1, Math.round((baseNet.reward * percent) / 100)) } : null;
 
     // Site visits and newer networks are paid here (works even on databases
     // whose claim_ad_view_v1 predates them).
