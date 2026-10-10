@@ -141,6 +141,9 @@ export function AdsTab() {
                     <p className="text-xs text-muted-foreground">
                       {n.used}/{n.cap} today · total {n.totalTokens} FOX ≈ {usd(n.totalUsd)}
                     </p>
+                    {(n.id === "adsgram" || n.id === "adsgram_int") && (
+                      <p className="text-[11px] font-bold text-primary">👆 {n.id === "adsgram" ? "3 taps" : "1 tap"} = 100%</p>
+                    )}
                   </div>
                   <span className="rounded-full bg-usdt/15 px-2.5 py-1 text-xs font-black text-usdt">+{n.reward}</span>
                 </div>
@@ -159,7 +162,7 @@ export function AdsTab() {
             );
           })}
           <GuideCard title="How rewards are verified">
-            Adsgram Reward: 0 taps 25%, 1 tap 50%, 2 taps 75%, 3+ taps 100%. Adsgram Interstitial: closed before 5s 50%, tapped or watched 100%. Monetag, GigaPub, Monetix: tap the ad at least once. Limits reset at 00:00 UTC.
+            Adsgram Reward: no tap 25%, 1 tap 50%, 2 taps 75%, 3+ taps 100%. Adsgram Interstitial: closed before 10s 25%, 10–15s 50%, watched 15s+ 75%, 1 tap 100%. Monetag, GigaPub, Monetix: tap the ad at least once. Limits reset at 00:00 UTC.
           </GuideCard>
         </div>
       ) : (

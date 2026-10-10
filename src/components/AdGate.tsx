@@ -1,11 +1,12 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Loader2, RotateCw, Tv, X, PartyPopper, MousePointerClick } from "lucide-react";
+import guideImg from "@/assets/ad-tap-guide.jpg.asset.json";
 import { showAd, type AdNetwork, type AdResult } from "@/lib/adsgram";
 
 /* ------------------------------------------------------------------ store */
 type Reward = { amount: number; label: string; taps?: number | undefined; percent?: number | undefined };
 type State = {
-  phase: "idle" | "loading" | "failed";
+  phase: "idle" | "intro" | "loading" | "failed";
   reward: Reward | null;
   cooldownUntil: number;
 };
@@ -92,7 +93,22 @@ export function AdOverlay() {
       {s.phase !== "idle" && (
         <div className="fixed inset-0 z-[100] grid place-items-center bg-background/90 p-6 backdrop-blur-sm">
           <div className="w-full max-w-xs animate-fade-up rounded-3xl border border-border bg-card p-6 text-center shadow-2xl">
-            {s.phase === "loading" ? (
+            {s.phase === "intro" && intro ? (
+              <>
+                <MousePointerClick className="mx-auto h-9 w-9 text-primary" />
+                <p className="mt-2 font-black">How to earn 100%</p>
+                <p className="text-sm font-bold text-primary">{RULES[intro]!.need}</p>
+                <img src={guideImg.url} alt="Tap the Join Now button in the ad" className="mt-3 w-full rounded-2xl border border-border" />
+                <p className="mt-2 text-xs text-muted-foreground">Tap the big button in the ad (Join Now / Open). Opening a link, bot, mini app or channel counts as a tap. Come back to the app after each tap.</p>
+                <div className="mt-3 space-y-1 text-left text-sm">
+                  {RULES[intro]!.rows.map(([a, b]) => (
+                    <div key={a} className="flex justify-between rounded-xl bg-secondary px-3 py-1.5 font-bold text-secondary-foreground"><span>{a}</span><span className="text-primary">{b}</span></div>
+                  ))}
+                </div>
+                <button onClick={() => void attempt()} className="mt-4 w-full rounded-2xl bg-primary py-3 font-bold text-primary-foreground active:scale-[0.98]">Start ad</button>
+                <button onClick={() => { const p = pending; pending = null; intro = null; set({ phase: "idle" }); p?.reject(new Error("AD_CANCELLED")); }} className="mt-2 w-full py-2 text-sm font-bold text-muted-foreground">Cancel</button>
+              </>
+            ) : s.phase === "loading" ? (
               <>
                 <Loader2 className="mx-auto h-10 w-10 animate-spin text-primary" />
                 <p className="mt-3 font-black">Loading ad…</p>
