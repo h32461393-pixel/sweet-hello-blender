@@ -6,6 +6,7 @@ export const ADMIN_TELEGRAM_ID = 5419054691;
 export const PUBLIC_APP_URL = "https://fox-farm.lovable.app";
 export const SITE_URL = "https://sweet-hello-blender.vercel.app";
 export const BANNER_URL = `${PUBLIC_APP_URL}/__l5e/assets-v1/d44082d7-4273-4267-9eaf-2f5a868540e4/fox-banner.png`;
+export const PAYOUT_PHOTO_URL = `${PUBLIC_APP_URL}/__l5e/assets-v1/1c62dee5-315f-4f3c-ab93-68f34be54476/withdraw-success.png`;
 
 /**
  * Asset pointers store a root-relative URL that only resolves on Lovable
