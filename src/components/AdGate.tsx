@@ -3,7 +3,7 @@ import { Loader2, RotateCw, Tv, X, PartyPopper, MousePointerClick } from "lucide
 import { showAd, type AdNetwork, type AdResult } from "@/lib/adsgram";
 
 /* ------------------------------------------------------------------ store */
-type Reward = { amount: number; label: string; taps?: number; percent?: number };
+type Reward = { amount: number; label: string; taps?: number | undefined; percent?: number | undefined };
 type State = {
   phase: "idle" | "loading" | "failed";
   reward: Reward | null;
