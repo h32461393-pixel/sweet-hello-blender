@@ -98,6 +98,9 @@ export function TigorixBonus({ compact = false }: { compact?: boolean }) {
             <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">🎁 Daily partner bonus</p>
             <p className="text-xl font-black text-primary">+{data.reward.toLocaleString()} FOX</p>
             <p className="text-[11px] font-bold text-muted-foreground">🦊 Fox Farm {Math.min(data.foxAds, data.foxTarget)}/{data.foxTarget} · 🐯 Tigorix {Math.min(data.tigorixAds, data.tigorixTarget)}/{data.tigorixTarget}</p>
+            {!data.linked && (
+              <p className="text-[10px] font-bold text-muted-foreground">Tigorix ads can&apos;t be counted yet — this site isn&apos;t connected to Tigorix.</p>
+            )}
           </div>
         </div>
         <div className="mt-3 grid grid-cols-2 gap-2">
