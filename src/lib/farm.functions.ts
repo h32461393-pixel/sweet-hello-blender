@@ -659,15 +659,27 @@ async function tigorixProgress(tgId: number): Promise<TigorixProgress> {
   // linked=false means this site cannot reach the Tigorix data at all.
   if (!url) return { started: false, ads: 0, linked: false, reason: "TIGORIX_SUPABASE_URL missing" };
   if (!key) return { started: false, ads: 0, linked: false, reason: "TIGORIX_SERVICE_KEY missing" };
+  const ownUrl = envFirst("SUPABASE_URL").replace(/\/+$/, "");
+  if (ownUrl && ownUrl === url) {
+    return { started: false, ads: 0, linked: false, reason: "TIGORIX_SUPABASE_URL is Fox Farm's own database URL, use the Tigorix one" };
+  }
+  if (key.startsWith("sb_publishable_")) {
+    return { started: false, ads: 0, linked: false, reason: "TIGORIX_SERVICE_KEY is a public key, use Tigorix's service_role / secret key" };
+  }
   const headers: Record<string, string> = { apikey: key };
   if (!key.startsWith("sb_")) headers["Authorization"] = `Bearer ${key}`;
   try {
     // Tigorix stores each player under their Telegram ID — match exactly that user.
     const r = await fetch(`${url}/rest/v1/docs?collection=eq.users&id=eq.${encodeURIComponent(String(tgId))}&select=data`, { headers, cache: "no-store" });
     if (!r.ok) {
-      const body = (await r.text().catch(() => "")).slice(0, 120);
+      const body = (await r.text().catch(() => "")).slice(0, 300);
       console.error("tigorix fetch failed", r.status, body);
-      return { started: false, ads: 0, linked: false, reason: `Tigorix DB error ${r.status}` };
+      let msg = "";
+      try { msg = String((JSON.parse(body) as { message?: string }).message ?? ""); } catch { /* not json */ }
+      let hint = "";
+      if (/invalid api key|jwt|signature|no api key/i.test(msg)) hint = "key does not belong to the Tigorix database — copy the service_role key from the SAME Tigorix project as the URL, then Redeploy";
+      else if (/permission denied/i.test(msg)) hint = "key has no access — use Tigorix's service_role key, not the anon key";
+      return { started: false, ads: 0, linked: false, reason: `Tigorix DB error ${r.status}${hint ? `: ${hint}` : msg ? `: ${msg.slice(0, 80)}` : ""}` };
     }
     const rows = (await r.json()) as { data?: Record<string, unknown> }[];
     const d = rows[0]?.data;
