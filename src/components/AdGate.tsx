@@ -45,14 +45,14 @@ async function attempt() {
 /**
  * Blocks the whole app until an ad is fully watched. Resolves with the number
  * of ad taps detected and how long the ad was open. Adsgram ads show a short
- * tap tutorial first.
+ * tap tutorial first unless explicitly skipped for an automatic ad.
  */
-export function requireAd(net: AdNetwork | (() => AdNetwork)): Promise<AdResult> {
+export function requireAd(net: AdNetwork | (() => AdNetwork), options?: { skipTutorial?: boolean }): Promise<AdResult> {
   if (pending) return Promise.reject(new Error("An ad is already open"));
   return new Promise<AdResult>((resolve, reject) => {
     const chosen = typeof net === "function" ? net() : net;
     pending = { pick: () => chosen, resolve, reject };
-    if (chosen === "adsgram" || chosen === "adsgram_int") {
+    if (!options?.skipTutorial && (chosen === "adsgram" || chosen === "adsgram_int")) {
       intro = chosen;
       set({ phase: "intro" });
     } else void attempt();
