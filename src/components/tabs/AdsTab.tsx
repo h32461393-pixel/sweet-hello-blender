@@ -44,9 +44,9 @@ export function AdsTab() {
     if (busy || cd.busy) return;
     setBusy(id);
     try {
-      await requireAd(id as AdNetwork);
-      const res = await claim.mutateAsync({ source: id as "adsgram" });
-      showRewardPopup(res.reward, label);
+      const ad = await requireAd(id as AdNetwork);
+      const res = await claim.mutateAsync({ source: id as "adsgram", taps: ad.taps, ms: ad.ms });
+      showRewardPopup(res.reward, label, res.taps ?? ad.taps, res.percent);
     } catch (e) {
       toast.error(friendlyError(e));
     } finally {

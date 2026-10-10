@@ -14,6 +14,7 @@ function rpcMessage(error: unknown, fallback: string): string {
   const msg = (error as { message?: string })?.message ?? "";
   if (/SUSPENDED/.test(msg)) return "SUSPENDED";
   const known = [
+    "Tap the ad at least once to earn",
     "Already claimed today",
     "Nothing to claim",
     "Mining is still running",
