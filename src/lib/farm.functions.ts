@@ -613,7 +613,103 @@ export const claimAdView = createServerFn({ method: "POST" })
       balance: Number(out.balance),
       used: Number(out.used),
       cap: Number(out.cap),
+      taps: data.taps,
+      percent,
     };
+  });
+
+/* ---------------------------------------------------------------------------
+ * Tigorix partner bonus: one-time reward after watching all Adsgram ads today
+ * in both Fox Farm and Tigorix. Tigorix data is read from its own database.
+ * ------------------------------------------------------------------------- */
+type TigorixCfg = { enabled: boolean; reward: number; foxTarget: number; tigorixTarget: number };
+async function tigorixConfig(db: Ctx["db"]): Promise<TigorixCfg> {
+  const c = (await getConfig(db, "tigorix")) as unknown as Record<string, unknown>;
+  return {
+    enabled: c["enabled"] === undefined ? true : c["enabled"] === true,
+    reward: Math.max(1, Math.min(1_000_000, Number(c["reward"] ?? 1000) || 1000)),
+    foxTarget: Math.max(1, Number(c["fox_target"] ?? 20) || 20),
+    tigorixTarget: Math.max(1, Number(c["tigorix_target"] ?? 15) || 15),
+  };
+}
+
+async function tigorixProgress(tgId: number): Promise<{ started: boolean; ads: number }> {
+  const url = process.env["TIGORIX_SUPABASE_URL"];
+  const key = process.env["TIGORIX_SERVICE_KEY"];
+  if (!url || !key) return { started: false, ads: 0 };
+  const headers: Record<string, string> = { apikey: key };
+  if (!key.startsWith("sb_")) headers["Authorization"] = `Bearer ${key}`;
+  try {
+    const r = await fetch(`${url}/rest/v1/docs?collection=eq.users&id=eq.${encodeURIComponent(String(tgId))}&select=data`, { headers });
+    if (!r.ok) return { started: false, ads: 0 };
+    const rows = (await r.json()) as { data?: Record<string, unknown> }[];
+    const d = rows[0]?.data;
+    if (!d) return { started: false, ads: 0 };
+    const today = todayUTC();
+    const n = (cnt: string, day: string) => (String(d[day] ?? "") === today ? Number(d[cnt] ?? 0) || 0 : 0);
+    return { started: true, ads: n("rewardAdsToday", "rewardAdsDayKey") + n("intAdsToday", "intAdsDayKey") };
+  } catch {
+    return { started: false, ads: 0 };
+  }
+}
+
+async function tigorixState(ctx: Ctx) {
+  const u = await getUserRow(ctx);
+  const cfg = await tigorixConfig(ctx.db);
+  const { count } = await ctx.db
+    .from("ad_views")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", u.id)
+    .eq("day", todayUTC())
+    .in("source", ["adsgram", "adsgram_int"]);
+  const { data: claimedRow } = await ctx.db
+    .from("transactions")
+    .select("id")
+    .eq("idempotency_key", `tigorix:${u.id}`)
+    .maybeSingle();
+  const tx = await tigorixProgress(ctx.tg.id);
+  const foxAds = Number(count ?? 0);
+  return {
+    u,
+    enabled: cfg.enabled,
+    reward: cfg.reward,
+    started: tx.started,
+    foxAds,
+    foxTarget: cfg.foxTarget,
+    tigorixAds: tx.ads,
+    tigorixTarget: cfg.tigorixTarget,
+    claimed: Boolean(claimedRow),
+    ready: tx.started && foxAds >= cfg.foxTarget && tx.ads >= cfg.tigorixTarget,
+  };
+}
+
+export const getTigorixBonus = createServerFn({ method: "POST" })
+  .inputValidator(vInit)
+  .handler(async ({ data }) => {
+    const ctx = await loadCtx(data.initData);
+    await rateLimit(ctx.db, "tigorix_state", ctx.tg.id, 30, 60);
+    const { u: _u, ...s } = await tigorixState(ctx);
+    return s;
+  });
+
+export const claimTigorixBonus = createServerFn({ method: "POST" })
+  .inputValidator(vInit)
+  .handler(async ({ data }) => {
+    const ctx = await loadCtx(data.initData);
+    await rateLimit(ctx.db, "tigorix_claim", ctx.tg.id, 5, 60);
+    const s = await tigorixState(ctx);
+    if (!s.enabled) throw new Error("This bonus is not available right now");
+    if (s.claimed) throw new Error("You already claimed this bonus");
+    if (!s.ready) throw new Error("Complete all requirements first");
+    const credit = await ctx.db.rpc("credit_user", {
+      _user_id: s.u.id,
+      _amount: s.reward,
+      _kind: "partner_bonus",
+      _note: "Tigorix partner bonus",
+      _key: `tigorix:${s.u.id}`,
+    });
+    if (credit.error) throw new Error(rpcMessage(credit.error, "Could not claim the bonus"));
+    return { reward: s.reward, balance: Number(credit.data ?? 0) };
   });
 
 /** Profile screen: user, recent transactions and referral overview. */
