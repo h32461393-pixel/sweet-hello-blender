@@ -134,7 +134,7 @@ function HomeInterstitial({ tab }: { tab: TabKey }) {
     preloadAds();
   }, []);
   useEffect(() => {
-    if (tab === "home") requireAd("adsgram_int").catch(() => {});
+    if (tab === "home") requireAd("adsgram_int", { skipTutorial: true }).catch(() => {});
   }, [tab]);
   return null;
 }
