@@ -139,7 +139,7 @@ export function TigorixBonus({ compact = false }: { compact?: boolean }) {
 
       {!data.linked && (
         <p className="mt-3 rounded-2xl bg-muted/60 px-3 py-2 text-[11px] font-bold text-muted-foreground">
-          Tigorix ads can&apos;t be counted yet — this site isn&apos;t connected to Tigorix.
+          Tigorix ads can&apos;t be counted yet — this site isn&apos;t connected to Tigorix ({data.reason}).
         </p>
       )}
 
