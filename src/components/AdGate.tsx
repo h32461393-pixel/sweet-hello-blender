@@ -1,11 +1,12 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { Loader2, RotateCw, Tv, X, PartyPopper } from "lucide-react";
-import { showAd, type AdNetwork } from "@/lib/adsgram";
+import { Loader2, RotateCw, Tv, X, PartyPopper, MousePointerClick } from "lucide-react";
+import { showAd, type AdNetwork, type AdResult } from "@/lib/adsgram";
 
 /* ------------------------------------------------------------------ store */
+type Reward = { amount: number; label: string; taps?: number; percent?: number };
 type State = {
   phase: "idle" | "loading" | "failed";
-  reward: { amount: number; label: string } | null;
+  reward: Reward | null;
   cooldownUntil: number;
 };
 let state: State = { phase: "idle", reward: null, cooldownUntil: 0 };
@@ -20,37 +21,37 @@ const subscribe = (f: () => void) => {
 };
 const useStore = () => useSyncExternalStore(subscribe, () => state, () => state);
 
-let pending: { pick: () => AdNetwork; resolve: () => void; reject: (e: Error) => void } | null = null;
+let pending: { pick: () => AdNetwork; resolve: (r: AdResult) => void; reject: (e: Error) => void } | null = null;
 export const AD_COOLDOWN_MS = 5000;
 
 async function attempt() {
   if (!pending) return;
   set({ phase: "loading" });
   try {
-    await showAd(pending.pick());
+    const r = await showAd(pending.pick());
     const p = pending;
     pending = null;
     set({ phase: "idle", cooldownUntil: Date.now() + AD_COOLDOWN_MS });
-    p.resolve();
+    p.resolve(r);
   } catch {
     set({ phase: "failed" });
   }
 }
 
 /**
- * Blocks the whole app until an ad is fully watched. If no ad is available the
- * user sees "Try again"; cancelling rejects so the caller gives no reward.
+ * Blocks the whole app until an ad is fully watched. Resolves with the number
+ * of ad taps detected and how long the ad was open.
  */
-export function requireAd(net: AdNetwork | (() => AdNetwork)): Promise<void> {
+export function requireAd(net: AdNetwork | (() => AdNetwork)): Promise<AdResult> {
   if (pending) return Promise.reject(new Error("An ad is already open"));
-  return new Promise<void>((resolve, reject) => {
+  return new Promise<AdResult>((resolve, reject) => {
     pending = { pick: typeof net === "function" ? net : () => net, resolve, reject };
     void attempt();
   });
 }
 
-export function showRewardPopup(amount: number, label: string) {
-  set({ reward: { amount, label } });
+export function showRewardPopup(amount: number, label: string, taps?: number, percent?: number) {
+  set({ reward: { amount, label, taps, percent } });
 }
 
 export function useAdCooldown() {
@@ -77,7 +78,7 @@ export function AdOverlay() {
               <>
                 <Loader2 className="mx-auto h-10 w-10 animate-spin text-primary" />
                 <p className="mt-3 font-black">Loading ad…</p>
-                <p className="text-xs text-muted-foreground">Please watch the full ad to continue.</p>
+                <p className="text-xs text-muted-foreground">Tap the ad to earn more FOX.</p>
               </>
             ) : (
               <>
@@ -113,6 +114,13 @@ export function AdOverlay() {
             <p className="mt-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">Verified reward</p>
             <p className="text-4xl font-black text-usdt">+{s.reward.amount.toLocaleString()}</p>
             <p className="font-bold">FOX · {s.reward.label}</p>
+            {s.reward.taps !== undefined && (
+              <div className="mt-3 flex items-center justify-center gap-2 rounded-2xl bg-secondary px-3 py-2 text-sm font-black text-secondary-foreground">
+                <MousePointerClick className="h-4 w-4" />
+                {s.reward.taps} tap{s.reward.taps === 1 ? "" : "s"}
+                {s.reward.percent !== undefined && <span className="text-primary">· {s.reward.percent}% reward</span>}
+              </div>
+            )}
             <button onClick={() => set({ reward: null })} className="mt-4 w-full rounded-2xl bg-primary py-3 font-bold text-primary-foreground">
               Awesome!
             </button>
