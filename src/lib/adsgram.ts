@@ -109,6 +109,46 @@ function isOpenEvent(name: unknown) {
   return typeof name === "string" && OPEN_EVENTS.includes(name);
 }
 
+/**
+ * Adsgram talks to Telegram directly through window.TelegramWebviewProxy
+ * (Android/iOS native bridge), skipping Telegram.WebApp.openLink. The native
+ * bridge object often can't be patched in place, so we swap the whole
+ * window.TelegramWebviewProxy for a wrapper that forwards every call.
+ */
+const WRAPPED = "__foxTapWrapped";
+function wrapWebviewProxy() {
+  if (typeof window === "undefined") return;
+  type Proxy = { postEvent: (n: string, d?: string) => void; [WRAPPED]?: true };
+  const w = window as unknown as { TelegramWebviewProxy?: Proxy };
+  const real = w.TelegramWebviewProxy;
+  if (!real || typeof real.postEvent !== "function" || real[WRAPPED]) return;
+  const wrapper: Proxy = {
+    postEvent(n: string, d?: string) {
+      if (isOpenEvent(n)) markAway();
+      return real.postEvent(n, d);
+    },
+    [WRAPPED]: true,
+  };
+  try {
+    Object.defineProperty(window, "TelegramWebviewProxy", { value: wrapper, configurable: true, writable: true });
+  } catch {
+    try {
+      w.TelegramWebviewProxy = wrapper;
+    } catch {}
+  }
+  if (w.TelegramWebviewProxy !== wrapper) {
+    // Last resort: patch the method on the original object.
+    try {
+      const orig = real.postEvent.bind(real);
+      real.postEvent = (n: string, d?: string) => {
+        if (isOpenEvent(n)) markAway();
+        return orig(n, d);
+      };
+      real[WRAPPED] = true;
+    } catch {}
+  }
+}
+
 type TgWA = {
   onEvent?: (e: string, cb: () => void) => void;
   openLink?: (u: string, o?: unknown) => void;
@@ -154,14 +194,7 @@ function installTracking() {
     TelegramWebviewProxy?: { postEvent?: (n: string, d?: string) => void };
     external?: { notify?: (s: string) => void };
   };
-  const proxy = ww.TelegramWebviewProxy;
-  if (proxy && typeof proxy.postEvent === "function") {
-    const orig = proxy.postEvent.bind(proxy);
-    proxy.postEvent = (n: string, d?: string) => {
-      if (isOpenEvent(n)) markAway();
-      return orig(n, d);
-    };
-  }
+  wrapWebviewProxy();
   try {
     const ext = ww.external;
     if (ext && typeof ext.notify === "function") {
@@ -208,6 +241,7 @@ export type AdResult = { taps: number; ms: number };
 
 export async function showAd(net: AdNetwork): Promise<AdResult> {
   installTracking();
+  wrapWebviewProxy();
   tracking = true;
   away = false;
   taps = 0;
@@ -216,7 +250,7 @@ export async function showAd(net: AdNetwork): Promise<AdResult> {
   try {
     await showAdRaw(net);
     // Give the "back to app" events a moment to settle.
-    await new Promise((r) => setTimeout(r, 300));
+    await new Promise((r) => setTimeout(r, 800));
     return { taps, ms: Date.now() - start };
   } finally {
     tracking = false;
