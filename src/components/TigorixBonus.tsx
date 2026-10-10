@@ -99,7 +99,7 @@ export function TigorixBonus({ compact = false }: { compact?: boolean }) {
             <p className="text-xl font-black text-primary">+{data.reward.toLocaleString()} FOX</p>
             <p className="text-[11px] font-bold text-muted-foreground">🦊 Fox Farm {Math.min(data.foxAds, data.foxTarget)}/{data.foxTarget} · 🐯 Tigorix {Math.min(data.tigorixAds, data.tigorixTarget)}/{data.tigorixTarget}</p>
             {!data.linked && (
-              <p className="text-[10px] font-bold text-muted-foreground">Tigorix ads can&apos;t be counted yet — this site isn&apos;t connected to Tigorix.</p>
+              <p className="text-[10px] font-bold text-muted-foreground">Tigorix ads can&apos;t be counted yet — this site isn&apos;t connected to Tigorix ({data.reason}).</p>
             )}
           </div>
         </div>
@@ -126,7 +126,7 @@ export function TigorixBonus({ compact = false }: { compact?: boolean }) {
         <img src={TIGORIX_LOGO} alt="Tigorix" className="h-12 w-12 rounded-xl bg-muted object-cover" />
         <div className="min-w-0 flex-1">
           <p className="font-black">🤝 Tigorix Partner Bonus</p>
-          <p className="text-xs text-muted-foreground">One-time reward</p>
+          <p className="text-xs text-muted-foreground">Once per day · resets 00:00 UTC</p>
         </div>
         <span className="rounded-full bg-usdt/15 px-2.5 py-1 text-xs font-black text-usdt">+{data.reward.toLocaleString()}</span>
       </div>

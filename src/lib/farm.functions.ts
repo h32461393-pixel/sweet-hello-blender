@@ -710,6 +710,7 @@ async function tigorixState(ctx: Ctx) {
     reward: cfg.reward,
     started: tx.started,
     linked: tx.linked,
+    reason: tx.reason,
     foxAds,
     foxTarget: cfg.foxTarget,
     tigorixAds: tx.ads,
