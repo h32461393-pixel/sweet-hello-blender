@@ -1,7 +1,7 @@
 import { dbHint } from "./db-errors";
 import { createServerFn } from "@tanstack/react-start";
 import { rateLimit, assertAdmin } from "./security.server";
-import { MINI_APP_URL, PAYMENT_URL, ADMIN_REFER_LINK } from "./constants";
+import { MINI_APP_URL, PAYMENT_URL, ADMIN_REFER_LINK, BANNER_URL } from "./constants";
 
 type Auth = { initData: string; username: string; password: string };
 
