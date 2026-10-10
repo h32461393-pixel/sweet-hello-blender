@@ -247,8 +247,8 @@ function Overview({ creds }: { creds: Creds }) {
     ["🚫 Suspended", data?.suspended ?? 0],
     ["📺 Ad views today", data?.adViewsToday ?? 0],
     ["⏳ Pending payouts", data?.pendingCount ?? 0],
-    ["💵 Pending USD", `$${(data?.pendingUsd ?? 0).toFixed(2)}`],
-    ["✅ Paid USD", `$${(data?.paidUsd ?? 0).toFixed(2)}`],
+    ["💵 Pending USD", `$${(data?.pendingUsd ?? 0).toFixed(4)}`],
+    ["✅ Paid USD", `$${(data?.paidUsd ?? 0).toFixed(4)}`],
   ] as const;
   return (
     <div className="grid grid-cols-2 gap-2">
@@ -384,7 +384,7 @@ function Payouts({ creds }: { creds: Creds }) {
       {(data?.withdrawals ?? []).map((w) => (
         <Card key={w.id}>
           <p className="text-sm font-bold">
-            {w.user} · 🪙 {w.tokens.toLocaleString()} → 💵 ${w.net.toFixed(2)}
+            {w.user} · 🪙 {w.tokens.toLocaleString()} → 💵 ${w.net.toFixed(4)}
           </p>
           <p className="break-all text-[11px] text-muted-foreground">{w.address}</p>
           {w.txid ? <p className="break-all text-[11px] text-primary">{w.txid}</p> : null}

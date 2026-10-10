@@ -1,7 +1,7 @@
 import { dbHint } from "./db-errors";
 import { createServerFn } from "@tanstack/react-start";
 import { rateLimit, assertAdmin } from "./security.server";
-import { MINI_APP_URL, PAYMENT_URL, ADMIN_REFER_LINK } from "./constants";
+import { MINI_APP_URL, PAYMENT_URL, ADMIN_REFER_LINK, BANNER_URL } from "./constants";
 
 type Auth = { initData: string; username: string; password: string };
 
@@ -260,7 +260,7 @@ export const adminProcessWithdrawal = createServerFn({ method: "POST" })
       await sendMessage(
         Number(u.telegram_id),
         data.action === "paid"
-          ? `✅ <b>Withdrawal paid!</b>\n🪙 ${Number(w?.amount_tokens ?? 0)} FOX\n💵 <b>$${Number(w?.net_usd ?? 0).toFixed(2)} USDT</b> (BEP-20)\n📬 <code>${w?.address}</code>\n\n🎉 Thank you for farming with us!`
+          ? `✅ <b>Withdrawal paid!</b>\n🪙 ${Number(w?.amount_tokens ?? 0)} FOX\n💵 <b>$${Number(w?.net_usd ?? 0).toFixed(4)} USDT</b> (BEP-20)\n📬 <code>${w?.address}</code>\n\n🎉 Thank you for farming with us!`
           : `❌ <b>Withdrawal rejected</b>\n🪙 ${Number(w?.amount_tokens ?? 0)} FOX has been returned to your balance.\n💬 Contact support if you think this is a mistake.`,
         scan
           ? [[{ text: "🔎 View transaction", url: scan }], [{ text: "🦊 Open Mini App", url: MINI_APP_URL }]]
@@ -275,9 +275,11 @@ export const adminProcessWithdrawal = createServerFn({ method: "POST" })
         process.env["PAYMENT_CHANNEL_ID"]?.trim() || `@${PAYMENT_URL.split("/").pop()}`;
       const short = (a: string) => (a.length > 14 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a);
       const date = new Date().toISOString().slice(0, 16).replace("T", " ");
-      const res = await sendMessage(
+      const { sendPhoto } = await import("./telegram.server");
+      const res = await sendPhoto(
         channel,
-        `🎉💸 <b>NEW PAYMENT SENT!</b> 💸🎉\n━━━━━━━━━━━━━━━\n👤 <b>User:</b> ${name}\n🪙 <b>Withdrawn:</b> ${Number(w?.amount_tokens ?? 0).toLocaleString()} FOX\n💵 <b>Received:</b> $${Number(w?.net_usd ?? 0).toFixed(2)} USDT\n🌐 <b>Network:</b> BEP-20 (BNB Smart Chain)\n📬 <b>Wallet:</b> <code>${short(String(w?.address ?? ""))}</code>\n🕒 <b>Date:</b> ${date} UTC\n✅ <b>Status:</b> Paid\n━━━━━━━━━━━━━━━\n🦊 <b>Fox Farm pays every day!</b> 🚀\n👇 Start farming now 👇`,
+        BANNER_URL,
+        `🎉💸 <b>NEW PAYMENT SENT!</b> 💸🎉\n━━━━━━━━━━━━━━━\n👤 <b>User:</b> ${name}\n🪙 <b>Withdrawn:</b> ${Number(w?.amount_tokens ?? 0).toLocaleString()} FOX\n💵 <b>Received:</b> $${Number(w?.net_usd ?? 0).toFixed(4)} USDT\n🌐 <b>Network:</b> BEP-20 (BNB Smart Chain)\n📬 <b>Wallet:</b> <code>${short(String(w?.address ?? ""))}</code>\n🕒 <b>Date:</b> ${date} UTC\n✅ <b>Status:</b> Paid\n━━━━━━━━━━━━━━━\n🦊 <b>Fox Farm pays every day!</b> 🚀\n👇 Start farming now 👇`,
         scan
           ? [
               [{ text: "🔎 View transaction", url: scan }],

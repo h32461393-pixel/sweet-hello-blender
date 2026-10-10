@@ -46,13 +46,13 @@ function Payouts() {
         <div className="rounded-2xl border border-border bg-card p-4">
           <p className="text-xs text-muted-foreground">Total paid out</p>
           <p className="text-2xl font-black text-primary">
-            ${isLoading ? "…" : (data?.totalPaidUsd ?? 0).toFixed(2)}
+            ${isLoading ? "…" : (data?.totalPaidUsd ?? 0).toFixed(4)}
           </p>
         </div>
         <div className="rounded-2xl border border-border bg-card p-4">
           <p className="text-xs text-muted-foreground">Pending</p>
           <p className="text-2xl font-black">
-            ${isLoading ? "…" : (data?.pendingUsd ?? 0).toFixed(2)}
+            ${isLoading ? "…" : (data?.pendingUsd ?? 0).toFixed(4)}
           </p>
         </div>
       </div>
@@ -76,7 +76,7 @@ function Payouts() {
           <div key={i} className="rounded-2xl border border-border bg-card p-4">
             <div className="flex items-center justify-between">
               <span className="font-bold">{p.user}</span>
-              <span className="font-black text-primary">${p.usd.toFixed(2)}</span>
+              <span className="font-black text-primary">${p.usd.toFixed(4)}</span>
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
               {p.tokens.toLocaleString()} FOX ·{" "}
