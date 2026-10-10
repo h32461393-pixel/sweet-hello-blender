@@ -241,6 +241,7 @@ export type AdResult = { taps: number; ms: number };
 
 export async function showAd(net: AdNetwork): Promise<AdResult> {
   installTracking();
+  wrapWebviewProxy();
   tracking = true;
   away = false;
   taps = 0;
@@ -249,7 +250,7 @@ export async function showAd(net: AdNetwork): Promise<AdResult> {
   try {
     await showAdRaw(net);
     // Give the "back to app" events a moment to settle.
-    await new Promise((r) => setTimeout(r, 300));
+    await new Promise((r) => setTimeout(r, 800));
     return { taps, ms: Date.now() - start };
   } finally {
     tracking = false;
