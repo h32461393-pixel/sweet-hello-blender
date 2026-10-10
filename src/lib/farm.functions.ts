@@ -673,16 +673,18 @@ async function tigorixProgress(tgId: number): Promise<{ started: boolean; ads: n
 async function tigorixState(ctx: Ctx) {
   const u = await getUserRow(ctx);
   const cfg = await tigorixConfig(ctx.db);
+  const today = todayUTC();
   const { count } = await ctx.db
     .from("ad_views")
     .select("id", { count: "exact", head: true })
     .eq("user_id", u.id)
-    .eq("day", todayUTC())
+    .eq("day", today)
     .in("source", ["adsgram", "adsgram_int"]);
+  // One claim per UTC day: the idempotency key carries the date.
   const { data: claimedRow } = await ctx.db
     .from("transactions")
     .select("id")
-    .eq("idempotency_key", `tigorix:${u.id}`)
+    .eq("idempotency_key", `tigorix:${u.id}:${today}`)
     .maybeSingle();
   const tx = await tigorixProgress(ctx.tg.id);
   const foxAds = Number(count ?? 0);
@@ -717,14 +719,14 @@ export const claimTigorixBonus = createServerFn({ method: "POST" })
     await rateLimit(ctx.db, "tigorix_claim", ctx.tg.id, 5, 60);
     const s = await tigorixState(ctx);
     if (!s.enabled) throw new Error("This bonus is not available right now");
-    if (s.claimed) throw new Error("You already claimed this bonus");
+    if (s.claimed) throw new Error("You already claimed today's bonus");
     if (!s.ready) throw new Error("Complete all requirements first");
     const credit = await ctx.db.rpc("credit_user", {
       _user_id: s.u.id,
       _amount: s.reward,
       _kind: "partner_bonus",
       _note: "Tigorix partner bonus",
-      _key: `tigorix:${s.u.id}`,
+      _key: `tigorix:${s.u.id}:${todayUTC()}`,
     });
     if (credit.error) throw new Error(rpcMessage(credit.error, "Could not claim the bonus"));
     return { reward: s.reward, balance: Number(credit.data ?? 0) };
