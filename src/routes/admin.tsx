@@ -698,22 +698,26 @@ function Notify({ creds }: { creds: Creds }) {
       let sent = 0;
       let failed = 0;
       let first: { channel: boolean | null; payment: boolean | null } | null = null;
+      let lastErr: string | null = null;
       while (offset !== null) {
         const r = await fn({ data: { ...creds, text, imageUrl, buttonText, buttonUrl, toUsers, toChannel, toPayment, offset } });
         if (!first) first = { channel: r.channel, payment: r.payment };
         sent += r.sent;
+        if (r.error) lastErr = r.error;
         failed += r.failed;
         offset = r.nextOffset;
         if (toUsers) setProgress(`Sending… ${sent + failed} / ${r.total} (✅ ${sent} · ❌ ${failed})`);
       }
-      return { sent, failed, ...first! };
+      return { sent, failed, ...first!, lastErr };
     },
     onSuccess: (r) => {
       const extra = [
         toChannel ? (r.channel ? "community ✅" : "community ❌") : "",
         toPayment ? (r.payment ? "payment ✅" : "payment ❌ (check HTML / bot admin)") : "",
       ].filter(Boolean).join(" · ");
-      toast.success(`Sent to ${r.sent} users (${r.failed} blocked/failed)${extra ? " · " + extra : ""}`);
+      const msg = `Sent to ${r.sent} users (${r.failed} failed)${extra ? " · " + extra : ""}`;
+      if (r.sent === 0 && r.lastErr) toast.error(`${msg} · Telegram: ${r.lastErr}`);
+      else toast.success(msg);
       setProgress(null);
       setText("");
     },
