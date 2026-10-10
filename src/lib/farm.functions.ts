@@ -245,12 +245,20 @@ export const getHomeState = createServerFn({ method: "POST" })
       .select("task_key")
       .eq("user_id", u.id)
       .eq("day", today);
+    const minedToday = await ctx.db
+      .from("transactions")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", u.id)
+      .eq("kind", "mining")
+      .gte("created_at", today + "T00:00:00Z");
 
     return {
       user: publicUser(u),
       mining: {
         reward: Number(mining["reward"] ?? 100),
         durationMinutes: Number(mining["duration_minutes"] ?? 60),
+        usedToday: minedToday.count ?? 0,
+        dailyLimit: 10,
       },
       daily: {
         rewards: (daily["rewards"] as number[]) ?? [30, 40, 50, 70, 90, 120, 150],

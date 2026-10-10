@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Coins, Gift, HelpCircle, Moon, Pickaxe, Send, Sun, Ticket, Wallet } from "lucide-react";
+import { TigorixBonus } from "@/components/TigorixBonus";
 import { MiningScene } from "@/components/farm/MiningScene";
 import { openFarmGuide } from "@/components/farm/FarmGuide";
 import { toast } from "sonner";
@@ -144,6 +145,22 @@ export function HomeTab({ onTab }: { onTab?: (t: TabKey) => void }) {
           </span>
         </div>
 
+        <div className="mt-3">
+          <div className="flex items-center justify-between text-xs font-bold">
+            <span>⛏️ Today's mining chances</span>
+            <span className="text-primary">{Math.max(0, data.mining.dailyLimit - data.mining.usedToday)} left</span>
+          </div>
+          <div className="mt-1.5 grid grid-cols-10 gap-1">
+            {Array.from({ length: data.mining.dailyLimit }, (_, i) => (
+              <span
+                key={i}
+                style={{ animationDelay: `${i * 40}ms` }}
+                className={`animate-fade-up h-2.5 rounded-full ${i < data.mining.usedToday ? "bg-usdt" : miningState.running && i === data.mining.usedToday ? "animate-pulse bg-primary" : "bg-muted"}`}
+              />
+            ))}
+          </div>
+          <p className="mt-1 text-[11px] text-muted-foreground">{data.mining.usedToday}/{data.mining.dailyLimit} used · resets at 00:00 UTC</p>
+        </div>
         <div className="my-4">
           <MiningScene
             mode={miningState.running ? "running" : miningState.claimable ? "ready" : "idle"}
@@ -197,6 +214,8 @@ export function HomeTab({ onTab }: { onTab?: (t: TabKey) => void }) {
             {miningState.running ? "Mining in progress…" : start.isPending ? "Starting…" : "Start mining"}
           </button>
         )}
+        <div className="mt-3" />
+        <TigorixBonus compact />
         <div className="mt-3" />
         <GuideCard title="How mining works">
           Start mining, wait 1 hour, then claim. Mining stops after each hour — you must claim
