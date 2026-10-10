@@ -8,6 +8,7 @@ import { useAdsState, useClaimAdView, friendlyError } from "@/hooks/useFarm";
 import { requireAd, showRewardPopup, useAdCooldown } from "@/components/AdGate";
 import type { AdNetwork } from "@/lib/adsgram";
 import { openLink } from "@/lib/telegram-client";
+import { TigorixBonus } from "@/components/TigorixBonus";
 
 
 const VISIT_SECONDS = 10;
@@ -103,6 +104,8 @@ export function AdsTab() {
           </p>
         </div>
       )}
+
+      <TigorixBonus />
 
       <div className="grid grid-cols-2 gap-1 rounded-2xl bg-secondary p-1">
         {(["ads", "sites"] as const).map((s) => (
