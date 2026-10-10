@@ -657,7 +657,11 @@ async function tigorixProgress(tgId: number): Promise<{ started: boolean; ads: n
     if (!d) return { started: false, ads: 0 };
     const today = todayUTC();
     const n = (cnt: string, day: string) => (String(d[day] ?? "") === today ? Number(d[cnt] ?? 0) || 0 : 0);
-    return { started: true, ads: n("rewardAdsToday", "rewardAdsDayKey") + n("intAdsToday", "intAdsDayKey") };
+    // Count every ad watched in Tigorix today: it keeps both a total counter
+    // and per-network counters, so use whichever it recorded.
+    const adsgram = n("rewardAdsToday", "rewardAdsDayKey") + n("intAdsToday", "intAdsDayKey");
+    const total = n("adsToday", "adsDayKey");
+    return { started: true, ads: Math.max(adsgram, total) };
   } catch {
     return { started: false, ads: 0 };
   }

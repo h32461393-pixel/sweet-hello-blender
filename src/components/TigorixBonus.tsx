@@ -130,7 +130,7 @@ export function TigorixBonus({ compact = false }: { compact?: boolean }) {
 
       <ul className="mt-3 space-y-1.5">
         <Req ok={data.started} text="Start the Tigorix mini app" />
-        <Req ok={data.tigorixAds >= data.tigorixTarget} text="Watch all Adsgram ads in Tigorix today" />
+        <Req ok={data.tigorixAds >= data.tigorixTarget} text="Watch all ads in Tigorix today" />
         <Req ok={data.foxAds >= data.foxTarget} text="Watch all Adsgram ads in Fox Farm today" />
       </ul>
 

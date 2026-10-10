@@ -105,6 +105,11 @@ export function useTigorixBonus(enabled = true) {
     queryFn: () => fn({ data: { initData: getInitData() } }),
     enabled,
     retry: 1,
+    // Tigorix counts ads inside its own mini app, so the numbers change while
+    // our tab is hidden. Refresh on return and keep the card close to live.
+    refetchOnWindowFocus: true,
+    refetchInterval: 15_000,
+    staleTime: 0,
   });
 }
 
