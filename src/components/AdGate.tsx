@@ -1,11 +1,12 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Loader2, RotateCw, Tv, X, PartyPopper, MousePointerClick } from "lucide-react";
+import guideImg from "@/assets/ad-tap-guide.jpg.asset.json";
 import { showAd, type AdNetwork, type AdResult } from "@/lib/adsgram";
 
 /* ------------------------------------------------------------------ store */
 type Reward = { amount: number; label: string; taps?: number | undefined; percent?: number | undefined };
 type State = {
-  phase: "idle" | "loading" | "failed";
+  phase: "idle" | "intro" | "loading" | "failed";
   reward: Reward | null;
   cooldownUntil: number;
 };
@@ -23,9 +24,11 @@ const useStore = () => useSyncExternalStore(subscribe, () => state, () => state)
 
 let pending: { pick: () => AdNetwork; resolve: (r: AdResult) => void; reject: (e: Error) => void } | null = null;
 export const AD_COOLDOWN_MS = 5000;
+let intro: AdNetwork | null = null;
 
 async function attempt() {
   if (!pending) return;
+  intro = null;
   set({ phase: "loading" });
   try {
     const r = await showAd(pending.pick());
@@ -40,15 +43,31 @@ async function attempt() {
 
 /**
  * Blocks the whole app until an ad is fully watched. Resolves with the number
- * of ad taps detected and how long the ad was open.
+ * of ad taps detected and how long the ad was open. Adsgram ads show a short
+ * tap tutorial first.
  */
 export function requireAd(net: AdNetwork | (() => AdNetwork)): Promise<AdResult> {
   if (pending) return Promise.reject(new Error("An ad is already open"));
   return new Promise<AdResult>((resolve, reject) => {
-    pending = { pick: typeof net === "function" ? net : () => net, resolve, reject };
-    void attempt();
+    const chosen = typeof net === "function" ? net() : net;
+    pending = { pick: () => chosen, resolve, reject };
+    if (chosen === "adsgram" || chosen === "adsgram_int") {
+      intro = chosen;
+      set({ phase: "intro" });
+    } else void attempt();
   });
 }
+
+const RULES: Record<string, { need: string; rows: [string, string][] }> = {
+  adsgram: {
+    need: "Tap the ad 3 times for 100%",
+    rows: [["No tap", "25%"], ["1 tap", "50%"], ["2 taps", "75%"], ["3+ taps", "100%"]],
+  },
+  adsgram_int: {
+    need: "Tap the ad 1 time for 100%",
+    rows: [["Closed before 10s", "25%"], ["10–15s, no tap", "50%"], ["Watched 15s+", "75%"], ["1 tap", "100%"]],
+  },
+};
 
 export function showRewardPopup(amount: number, label: string, taps?: number, percent?: number) {
   set({ reward: { amount, label, taps, percent } });
@@ -74,7 +93,22 @@ export function AdOverlay() {
       {s.phase !== "idle" && (
         <div className="fixed inset-0 z-[100] grid place-items-center bg-background/90 p-6 backdrop-blur-sm">
           <div className="w-full max-w-xs animate-fade-up rounded-3xl border border-border bg-card p-6 text-center shadow-2xl">
-            {s.phase === "loading" ? (
+            {s.phase === "intro" && intro ? (
+              <>
+                <MousePointerClick className="mx-auto h-9 w-9 text-primary" />
+                <p className="mt-2 font-black">How to earn 100%</p>
+                <p className="text-sm font-bold text-primary">{RULES[intro]!.need}</p>
+                <img src={guideImg.url} alt="Tap the Join Now button in the ad" className="mt-3 w-full rounded-2xl border border-border" />
+                <p className="mt-2 text-xs text-muted-foreground">Tap the big button in the ad (Join Now / Open). Opening a link, bot, mini app or channel counts as a tap. Come back to the app after each tap.</p>
+                <div className="mt-3 space-y-1 text-left text-sm">
+                  {RULES[intro]!.rows.map(([a, b]) => (
+                    <div key={a} className="flex justify-between rounded-xl bg-secondary px-3 py-1.5 font-bold text-secondary-foreground"><span>{a}</span><span className="text-primary">{b}</span></div>
+                  ))}
+                </div>
+                <button onClick={() => void attempt()} className="mt-4 w-full rounded-2xl bg-primary py-3 font-bold text-primary-foreground active:scale-[0.98]">Start ad</button>
+                <button onClick={() => { const p = pending; pending = null; intro = null; set({ phase: "idle" }); p?.reject(new Error("AD_CANCELLED")); }} className="mt-2 w-full py-2 text-sm font-bold text-muted-foreground">Cancel</button>
+              </>
+            ) : s.phase === "loading" ? (
               <>
                 <Loader2 className="mx-auto h-10 w-10 animate-spin text-primary" />
                 <p className="mt-3 font-black">Loading ad…</p>
