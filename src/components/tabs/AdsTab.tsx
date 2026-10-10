@@ -159,7 +159,7 @@ export function AdsTab() {
             );
           })}
           <GuideCard title="How rewards are verified">
-            A reward is added only after the ad network confirms a finished ad. No ad = no reward. Daily limits reset at 00:00 UTC.
+            Adsgram Reward: 0 taps 25%, 1 tap 50%, 2 taps 75%, 3+ taps 100%. Adsgram Interstitial: closed before 5s 50%, tapped or watched 100%. Monetag, GigaPub, Monetix: tap the ad at least once. Limits reset at 00:00 UTC.
           </GuideCard>
         </div>
       ) : (
