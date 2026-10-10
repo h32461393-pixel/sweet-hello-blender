@@ -521,7 +521,7 @@ export const adminBroadcast = createServerFn({ method: "POST" })
     if (first && !data.toUsers) {
       // Check HTML is valid by the channel result only.
       await audit(ctx, "broadcast", null, { sent: 0, channel, payment });
-      return { sent: 0, failed: 0, total: 0, nextOffset: null as number | null, channel, payment };
+      return { sent: 0, failed: 0, total: 0, nextOffset: null as number | null, channel, payment, error: tg.lastTgError };
     }
     const PAGE = 150;
     const { count } = await ctx.db.from("app_users").select("id", { count: "exact", head: true }).eq("suspended", false);
@@ -547,7 +547,7 @@ export const adminBroadcast = createServerFn({ method: "POST" })
     const nextOffset = list.length === PAGE ? data.offset + PAGE : null;
     if (first || nextOffset === null)
       await audit(ctx, "broadcast", null, { offset: data.offset, sent, failed, channel, payment, done: nextOffset === null });
-    return { sent, failed, total: count ?? 0, nextOffset, channel, payment };
+    return { sent, failed, total: count ?? 0, nextOffset, channel, payment, error: sent === 0 ? tg.lastTgError : null };
   });
 
 export const adminListCodes = createServerFn({ method: "POST" })
