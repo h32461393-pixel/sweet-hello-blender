@@ -406,21 +406,7 @@ export function ProfileTab() {
       <div>
         <SubHeader title={t(lang, "back")} onBack={() => setScreen("main")} />
         <SectionTitle>🏆 {t(lang, "leaderboard")}</SectionTitle>
-        {board.isLoading ? (
-          <p className="text-sm text-muted-foreground">Loading…</p>
-        ) : (
-          <ul className="space-y-2">
-            {(board.data?.leaderboard ?? []).map((r) => (
-              <li key={r.rank} className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3 text-sm">
-                <span className="w-8 text-center text-lg">
-                  {r.rank === 1 ? "🥇" : r.rank === 2 ? "🥈" : r.rank === 3 ? "🥉" : r.rank}
-                </span>
-                <span className="flex-1 truncate font-semibold">{r.user}</span>
-                <span className="font-bold text-primary">{r.earned.toLocaleString()} FOX</span>
-              </li>
-            ))}
-          </ul>
-        )}
+        <LeaderboardView data={board.data} loading={board.isLoading} />
       </div>
     );
   }
@@ -592,5 +578,86 @@ function WithdrawHistory({
         </ul>
       )}
     </>
+  );
+}
+
+type BoardRow = { rank: number; user: string; photo?: string | null | undefined; value: number };
+
+function LeaderboardView({
+  data,
+  loading,
+}: {
+  data?: { leaderboard: { rank: number; user: string; photo?: string | null | undefined; earned: number }[]; referralBoard?: { rank: number; user: string; photo?: string | null | undefined; count: number }[] | undefined } | undefined;
+  loading: boolean;
+}) {
+  const [kind, setKind] = useState<"earn" | "ref">("earn");
+  const rows: BoardRow[] =
+    kind === "earn"
+      ? (data?.leaderboard ?? []).map((r) => ({ ...r, value: r.earned }))
+      : (data?.referralBoard ?? []).map((r) => ({ ...r, value: r.count }));
+  const unit = kind === "earn" ? "FOX" : "refs";
+  const podium = [rows[1], rows[0], rows[2]];
+  const medal = ["🥈", "🥇", "🥉"];
+  const heights = ["h-20", "h-28", "h-16"];
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-1 rounded-2xl bg-secondary p-1">
+        {(["earn", "ref"] as const).map((k) => (
+          <button
+            key={k}
+            onClick={() => setKind(k)}
+            className={`rounded-xl py-2 text-sm font-black transition-all ${kind === k ? "bg-primary text-primary-foreground shadow-md" : "text-secondary-foreground"}`}
+          >
+            {k === "earn" ? "🏆 Top earners" : "👥 Top referrers"}
+          </button>
+        ))}
+      </div>
+      {loading ? (
+        <p className="py-8 text-center text-sm text-muted-foreground">Loading…</p>
+      ) : rows.length === 0 ? (
+        <p className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">No data yet</p>
+      ) : (
+        <>
+          <div className="grid grid-cols-3 items-end gap-2 rounded-3xl bg-gradient-to-b from-primary/15 to-card p-4">
+            {podium.map((r, i) =>
+              r ? (
+                <div key={r.rank} className="animate-fade-up flex flex-col items-center gap-1" style={{ animationDelay: `${i * 100}ms` }}>
+                  <span className="text-2xl">{medal[i]}</span>
+                  <Avatar name={r.user} photo={r.photo} big={i === 1} />
+                  <p className="w-full truncate text-center text-xs font-bold">{r.user}</p>
+                  <div className={`flex w-full flex-col items-center justify-start rounded-t-2xl bg-primary pt-2 text-primary-foreground ${heights[i]}`}>
+                    <span className="text-xs font-black">{r.value.toLocaleString()}</span>
+                    <span className="text-[10px] opacity-80">{unit}</span>
+                  </div>
+                </div>
+              ) : (
+                <div key={i} />
+              ),
+            )}
+          </div>
+          <ul className="space-y-2">
+            {rows.slice(3).map((r, i) => (
+              <li key={r.rank} style={{ animationDelay: `${i * 40}ms` }} className="animate-fade-up flex items-center gap-3 rounded-2xl border border-border bg-card p-3 text-sm">
+                <span className="w-6 text-center font-black text-muted-foreground">{r.rank}</span>
+                <Avatar name={r.user} photo={r.photo} />
+                <span className="flex-1 truncate font-semibold">{r.user}</span>
+                <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-black text-primary">
+                  {r.value.toLocaleString()} {unit}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  );
+}
+
+function Avatar({ name, photo, big }: { name: string; photo?: string | null | undefined; big?: boolean | undefined }) {
+  const size = big ? "h-14 w-14 ring-4 ring-primary/40" : "h-10 w-10";
+  return (
+    <span className={`grid shrink-0 place-items-center overflow-hidden rounded-full bg-primary/15 font-black text-primary ${size}`}>
+      {photo ? <img src={photo} alt="" className="h-full w-full object-cover" loading="lazy" /> : name.replace("@", "").slice(0, 1).toUpperCase()}
+    </span>
   );
 }
