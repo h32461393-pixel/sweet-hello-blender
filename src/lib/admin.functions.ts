@@ -454,53 +454,84 @@ export const adminAudit = createServerFn({ method: "POST" })
     return { entries: rows ?? [] };
   });
 
-/** Broadcast an announcement to every user through the bot. */
+/** Broadcast to every user in pages (the admin page loops until done) so no request times out. */
 export const adminBroadcast = createServerFn({ method: "POST" })
   .inputValidator(
-    (d: Auth & { text: string; imageUrl?: string; buttonText?: string; buttonUrl?: string; toUsers?: boolean; toChannel?: boolean }) => {
+    (d: Auth & { text: string; imageUrl?: string; buttonText?: string; buttonUrl?: string; toUsers?: boolean; toChannel?: boolean; toPayment?: boolean; offset?: number }) => {
       vAuth(d);
-      const text = String(d.text ?? "").trim().slice(0, 1000);
+      const text = String(d.text ?? "").trim().slice(0, 4000);
       if (text.length < 3) throw new Error("Message is too short");
       const imageUrl = String(d.imageUrl ?? "").trim().slice(0, 500);
       if (imageUrl && !/^https:\/\//i.test(imageUrl)) throw new Error("Image link must start with https://");
       const buttonUrl = String(d.buttonUrl ?? "").trim().slice(0, 300);
       if (buttonUrl && !/^https:\/\//i.test(buttonUrl)) throw new Error("Button link must start with https://");
+      const offset = Math.max(0, Math.floor(Number(d.offset ?? 0)) || 0);
       return {
         ...d,
         text,
         imageUrl,
         buttonUrl,
+        offset,
         buttonText: String(d.buttonText ?? "").trim().slice(0, 40),
         toUsers: d.toUsers !== false,
         toChannel: d.toChannel === true,
+        toPayment: d.toPayment === true,
       };
     },
   )
   .handler(async ({ data }) => {
     const ctx = await adminCtx(data);
-    await rateLimit(ctx.db, "admin_broadcast", ctx.adminId, 5, 3600);
+    const first = data.offset === 0;
+    if (first) await rateLimit(ctx.db, "admin_broadcast", ctx.adminId, 10, 3600);
     const { sendMessage, sendPhoto } = await import("./telegram.server");
     const buttons: { text: string; url: string }[][] = [];
     if (data.buttonUrl) buttons.push([{ text: data.buttonText || "🔗 Open", url: data.buttonUrl }]);
     buttons.push([{ text: "🦊 Open Mini App", url: MINI_APP_URL }]);
-    const send = (chat: number | string) =>
-      data.imageUrl ? sendPhoto(chat, data.imageUrl, data.text, buttons) : sendMessage(chat, data.text, buttons);
-    let sent = 0;
-    let channel = false;
-    if (data.toChannel) channel = Boolean(await send("@foxfarm_community").catch(() => null));
-    if (data.toUsers) {
-      const { data: rows } = await ctx.db.from("app_users").select("telegram_id").eq("suspended", false).limit(3000);
-      for (const r of rows ?? []) {
-        try {
-          if (await send(Number(r.telegram_id))) sent += 1;
-        } catch {
-          /* blocked */
-        }
-        await new Promise((res) => setTimeout(res, 40));
-      }
+    // Photo captions are limited to 1024 chars: longer texts go as photo + separate message.
+    const send = async (chat: number | string) => {
+      if (!data.imageUrl) return sendMessage(chat, data.text, buttons);
+      if (data.text.length <= 1024) return sendPhoto(chat, data.imageUrl, data.text, buttons);
+      const p = await sendPhoto(chat, data.imageUrl, "");
+      if (!p) return null;
+      return sendMessage(chat, data.text, buttons);
+    };
+    let channel: boolean | null = null;
+    let payment: boolean | null = null;
+    if (first && data.toChannel) channel = Boolean(await send("@foxfarm_community").catch(() => null));
+    if (first && data.toPayment) {
+      const pay = process.env["PAYMENT_CHANNEL_ID"]?.trim() || `@${PAYMENT_URL.split("/").pop()}`;
+      payment = Boolean(await send(pay).catch(() => null));
     }
-    await audit(ctx, "broadcast", null, { sent, channel, image: Boolean(data.imageUrl) });
-    return { sent, channel };
+    if (first && !data.toUsers) {
+      // Check HTML is valid by the channel result only.
+      await audit(ctx, "broadcast", null, { sent: 0, channel, payment });
+      return { sent: 0, failed: 0, total: 0, nextOffset: null as number | null, channel, payment };
+    }
+    const PAGE = 150;
+    const { count } = await ctx.db.from("app_users").select("id", { count: "exact", head: true }).eq("suspended", false);
+    const { data: rows, error } = await ctx.db
+      .from("app_users")
+      .select("telegram_id")
+      .eq("suspended", false)
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
+      .range(data.offset, data.offset + PAGE - 1);
+    if (error) throw new Error("Could not load users");
+    let sent = 0;
+    let failed = 0;
+    const list = rows ?? [];
+    // ~25 messages per second, under Telegram's 30/s bot limit.
+    for (let i = 0; i < list.length; i += 25) {
+      const t0 = Date.now();
+      const res = await Promise.all(list.slice(i, i + 25).map((r) => send(Number(r.telegram_id)).catch(() => null)));
+      for (const r of res) r ? sent++ : failed++;
+      const wait = 1050 - (Date.now() - t0);
+      if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    }
+    const nextOffset = list.length === PAGE ? data.offset + PAGE : null;
+    if (first || nextOffset === null)
+      await audit(ctx, "broadcast", null, { offset: data.offset, sent, failed, channel, payment, done: nextOffset === null });
+    return { sent, failed, total: count ?? 0, nextOffset, channel, payment };
   });
 
 export const adminListCodes = createServerFn({ method: "POST" })

@@ -689,14 +689,35 @@ function Notify({ creds }: { creds: Creds }) {
   const [buttonUrl, setButtonUrl] = useState("");
   const [toUsers, setToUsers] = useState(true);
   const [toChannel, setToChannel] = useState(false);
+  const [toPayment, setToPayment] = useState(false);
+  const [progress, setProgress] = useState<string | null>(null);
   const fn = useServerFn(adminBroadcast);
   const send = useMutation({
-    mutationFn: () => fn({ data: { ...creds, text, imageUrl, buttonText, buttonUrl, toUsers, toChannel } }),
+    mutationFn: async () => {
+      let offset: number | null = 0;
+      let sent = 0;
+      let failed = 0;
+      let first: { channel: boolean | null; payment: boolean | null } | null = null;
+      while (offset !== null) {
+        const r = await fn({ data: { ...creds, text, imageUrl, buttonText, buttonUrl, toUsers, toChannel, toPayment, offset } });
+        if (!first) first = { channel: r.channel, payment: r.payment };
+        sent += r.sent;
+        failed += r.failed;
+        offset = r.nextOffset;
+        if (toUsers) setProgress(`Sending… ${sent + failed} / ${r.total} (✅ ${sent} · ❌ ${failed})`);
+      }
+      return { sent, failed, ...first! };
+    },
     onSuccess: (r) => {
-      toast.success(`Sent to ${r.sent} users${toChannel ? (r.channel ? " + channel" : " (channel failed)") : ""}`);
+      const extra = [
+        toChannel ? (r.channel ? "community ✅" : "community ❌") : "",
+        toPayment ? (r.payment ? "payment ✅" : "payment ❌ (check HTML / bot admin)") : "",
+      ].filter(Boolean).join(" · ");
+      toast.success(`Sent to ${r.sent} users (${r.failed} blocked/failed)${extra ? " · " + extra : ""}`);
+      setProgress(null);
       setText("");
     },
-    onError: (e) => toast.error((e as Error).message),
+    onError: (e) => { setProgress(null); toast.error((e as Error).message); },
   });
   return (
     <Card>
@@ -715,13 +736,15 @@ function Notify({ creds }: { creds: Creds }) {
         <Field label="Button link (optional)" value={buttonUrl} onChange={setButtonUrl} placeholder="https://…" />
         <label className="flex items-center gap-2 text-xs font-bold"><input type="checkbox" checked={toUsers} onChange={(e) => setToUsers(e.target.checked)} /> All users</label>
         <label className="flex items-center gap-2 text-xs font-bold"><input type="checkbox" checked={toChannel} onChange={(e) => setToChannel(e.target.checked)} /> Community channel</label>
+        <label className="flex items-center gap-2 text-xs font-bold"><input type="checkbox" checked={toPayment} onChange={(e) => setToPayment(e.target.checked)} /> Payment channel</label>
+        <p className="text-[11px] text-muted-foreground">Keep this page open until sending finishes.</p>
       </div>
       <button
         onClick={() => send.mutate()}
         disabled={send.isPending || (!toUsers && !toChannel)}
         className="mt-2 w-full rounded-xl bg-primary py-2 text-sm font-black text-primary-foreground disabled:opacity-50"
       >
-        {send.isPending ? "Sending…" : "📣 Send"}
+        {send.isPending ? (progress ?? "Sending…") : "📣 Send"}
       </button>
     </Card>
   );
