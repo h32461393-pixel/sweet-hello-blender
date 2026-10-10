@@ -48,6 +48,7 @@ function loadScript(key: keyof typeof SCRIPTS): Promise<void> {
 
 /** Preload all networks after the app opens (non-blocking). */
 export function preloadAds() {
+  installTracking();
   for (const k of Object.keys(SCRIPTS)) loadScript(k as keyof typeof SCRIPTS).catch(() => {});
 }
 
@@ -85,16 +86,27 @@ let taps = 0;
 let lastTap = 0;
 let installed = false;
 
+let awayTimer: ReturnType<typeof setTimeout> | undefined;
 function markAway() {
-  if (!tracking || away) return;
+  if (!tracking) return;
   const now = Date.now();
-  away = true;
+  if (away && now - lastTap < 1500) return;
   if (now - lastTap < 1500) return;
+  away = true;
   lastTap = now;
   taps += 1;
+  // Telegram often keeps the mini app open when a channel/bot opens over it,
+  // so no "back" event fires — release the lock automatically.
+  clearTimeout(awayTimer);
+  awayTimer = setTimeout(() => (away = false), 1500);
 }
 function markBack() {
   away = false;
+}
+
+const OPEN_EVENTS = ["web_app_open_link", "web_app_open_tg_link", "web_app_open_invoice", "web_app_switch_inline_query"];
+function isOpenEvent(name: unknown) {
+  return typeof name === "string" && OPEN_EVENTS.includes(name);
 }
 
 type TgWA = {
@@ -108,11 +120,74 @@ function installTracking() {
   window.addEventListener("blur", markAway);
   window.addEventListener("focus", markBack);
   document.addEventListener("visibilitychange", () => (document.hidden ? markAway() : markBack()));
+
+  // Taps on links / buttons inside the ad overlay (Join, View, Open, Play…).
+  document.addEventListener(
+    "click",
+    (e) => {
+      if (!tracking) return;
+      const path = (e.composedPath?.() ?? []) as Element[];
+      for (const el of path) {
+        if (!(el instanceof Element)) continue;
+        if (el.id === "root" || el.tagName === "BODY") break;
+        const tag = el.tagName;
+        if (tag === "A" && (el as HTMLAnchorElement).href) return markAway();
+        if (tag === "BUTTON" || el.getAttribute?.("role") === "button") {
+          const txt = (el.textContent ?? "").trim().toLowerCase();
+          if (!txt || /^(close|skip|✕|×|x)$|close|skip/.test(txt)) return;
+          return markAway();
+        }
+      }
+    },
+    true,
+  );
+
   const origOpen = window.open.bind(window);
   window.open = ((...a: Parameters<typeof window.open>) => {
     markAway();
     return origOpen(...a);
   }) as typeof window.open;
+
+  // Low-level Telegram bridge — catches link opens even when the ad SDK
+  // bypasses Telegram.WebApp.openLink / openTelegramLink.
+  const ww = window as unknown as {
+    TelegramWebviewProxy?: { postEvent?: (n: string, d?: string) => void };
+    external?: { notify?: (s: string) => void };
+  };
+  const proxy = ww.TelegramWebviewProxy;
+  if (proxy && typeof proxy.postEvent === "function") {
+    const orig = proxy.postEvent.bind(proxy);
+    proxy.postEvent = (n: string, d?: string) => {
+      if (isOpenEvent(n)) markAway();
+      return orig(n, d);
+    };
+  }
+  try {
+    const ext = ww.external;
+    if (ext && typeof ext.notify === "function") {
+      const orig = ext.notify.bind(ext);
+      ext.notify = (s: string) => {
+        try {
+          if (isOpenEvent(JSON.parse(s)?.eventType)) markAway();
+        } catch {}
+        return orig(s);
+      };
+    }
+  } catch {}
+  if (window.parent && window.parent !== window) {
+    const p = window.parent;
+    const orig = p.postMessage.bind(p);
+    try {
+      p.postMessage = ((msg: unknown, ...rest: unknown[]) => {
+        try {
+          const m = typeof msg === "string" ? JSON.parse(msg) : msg;
+          if (isOpenEvent((m as { eventType?: string })?.eventType)) markAway();
+        } catch {}
+        return (orig as (...x: unknown[]) => void)(msg, ...rest);
+      }) as typeof p.postMessage;
+    } catch {}
+  }
+
   const wa = (window as unknown as { Telegram?: { WebApp?: TgWA } }).Telegram?.WebApp;
   if (wa) {
     wa.onEvent?.("deactivated", markAway);
