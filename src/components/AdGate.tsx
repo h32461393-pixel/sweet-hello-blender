@@ -1,6 +1,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Loader2, RotateCw, Tv, X, PartyPopper, MousePointerClick } from "lucide-react";
 import guideImg from "@/assets/ad-tap-guide.jpg.asset.json";
+import { assetUrl } from "@/lib/constants";
 import { showAd, type AdNetwork, type AdResult } from "@/lib/adsgram";
 
 /* ------------------------------------------------------------------ store */
@@ -98,7 +99,7 @@ export function AdOverlay() {
                 <MousePointerClick className="mx-auto h-9 w-9 text-primary" />
                 <p className="mt-2 font-black">How to earn 100%</p>
                 <p className="text-sm font-bold text-primary">{RULES[intro]!.need}</p>
-                <img src={guideImg.url} alt="Tap the Join Now button in the ad" className="mt-3 w-full rounded-2xl border border-border" />
+                <img src={assetUrl(guideImg.url)} alt="Tap the Join Now button in the ad" className="mt-3 w-full rounded-2xl border border-border" />
                 <p className="mt-2 text-xs text-muted-foreground">Tap the big button in the ad (Join Now / Open). Opening a link, bot, mini app or channel counts as a tap. Come back to the app after each tap.</p>
                 <div className="mt-3 space-y-1 text-left text-sm">
                   {RULES[intro]!.rows.map(([a, b]) => (
