@@ -18,6 +18,7 @@ import {
   useStartMining,
   useClaimMining,
   useClaimDaily,
+  useDailyBio,
   useClaimRewardCode,
   friendlyError,
 } from "@/hooks/useFarm";
@@ -44,6 +45,7 @@ export function HomeTab({ onTab }: { onTab?: (t: TabKey) => void }) {
   const start = useStartMining();
   const claim = useClaimMining();
   const daily = useClaimDaily();
+  const bioQuery = useDailyBio();
   const code = useClaimRewardCode();
   const [codeValue, setCodeValue] = useState("");
 
