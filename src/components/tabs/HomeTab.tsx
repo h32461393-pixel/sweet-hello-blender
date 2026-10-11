@@ -303,7 +303,7 @@ export function HomeTab({ onTab }: { onTab?: (t: TabKey) => void }) {
             );
           })}
         </div>
-        <BioBoost telegramId={u.telegramId} inBio={!!bio.data?.inBio} checking={bio.isFetching} onCheck={() => bio.refetch()} />
+        <BioBoost telegramId={u.telegramId} inBio={!!bio.data?.inBio} checked={bio.data !== undefined} checking={bio.isFetching} onCheck={() => bio.refetch()} />
         <button
           disabled={data.daily.claimedToday || daily.isPending}
           onClick={() => {
@@ -387,7 +387,7 @@ function QuickTasks({ onTab }: { onTab?: ((t: TabKey) => void) | undefined }) {
   );
 }
 
-function BioBoost({ telegramId, inBio, checking, onCheck }: { telegramId: number; inBio: boolean; checking: boolean; onCheck: () => void }) {
+function BioBoost({ telegramId, inBio, checked, checking, onCheck }: { telegramId: number; inBio: boolean; checked: boolean; checking: boolean; onCheck: () => void }) {
   const link = `${MINI_APP_URL}?startapp=ref${telegramId}`;
   return (
     <div
@@ -406,6 +406,11 @@ function BioBoost({ telegramId, inBio, checking, onCheck }: { telegramId: number
       </div>
       {!inBio && (
         <>
+          {checked && !checking && (
+            <p className="mt-2 rounded-xl border border-destructive/40 bg-destructive/10 px-2 py-1.5 text-[11px] font-bold text-destructive">
+              ❌ Your invite link is not in your bio — you get the normal daily reward (no 2×).
+            </p>
+          )}
           <p className="mt-2 truncate rounded-xl bg-background/70 px-2 py-1.5 font-mono text-[11px]">{link}</p>
           <div className="mt-2 grid grid-cols-2 gap-2">
             <button
