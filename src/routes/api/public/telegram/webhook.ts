@@ -45,7 +45,14 @@ export const Route = createFileRoute("/api/public/telegram/webhook")({
 
         const msg = update.message;
         if (msg?.text?.startsWith("/start")) {
-          const caption = `🦊 <b>Fox Farm</b> 🌾\n\nWelcome${msg.from?.first_name ? ", " + msg.from.first_name : ""}!\n\n⛏️ Mine FOX tokens every hour\n✅ Complete daily and partner tasks\n👥 Invite friends and earn up to 1,200 FOX each\n🎁 Daily streak rewards up to 150 FOX\n💸 Withdraw in USDT (BEP-20)\n\nTap below to start farming!`;
+          const { supabaseAdmin: cdb } = await import("@/integrations/supabase/client.server");
+          const cfgs = await cdb.from("app_config").select("key, value").in("key", ["referral", "daily", "mining"]);
+          const cv = (k: string) => ((cfgs.data ?? []).find((r) => r.key === k)?.value ?? {}) as Record<string, unknown>;
+          const rc = cv("referral");
+          const refTotal = Number(rc["join"] ?? 200) + Number(rc["day1"] ?? 400) + Number(rc["day2"] ?? 600);
+          const dr = ((cv("daily")["rewards"] as number[]) ?? [30, 40, 50, 70, 90, 120, 150]).map(Number);
+          const mr = Number(cv("mining")["reward"] ?? 100);
+          const caption = `🦊 <b>Fox Farm</b> 🌾\n\nWelcome${msg.from?.first_name ? ", " + msg.from.first_name : ""}!\n\n⛏️ Mine ${mr} FOX every session\n✅ Complete daily and partner tasks\n👥 Invite friends and earn up to ${refTotal.toLocaleString()} FOX each\n🎁 Daily streak rewards up to ${Math.max(...dr)} FOX\n💸 Withdraw in USDT (BEP-20)\n\nTap below to start farming!`;
           const buttons = [
             [{ text: "🦊 Open Mini App", url: MINI_APP_URL }],
             [{ text: "📢 Community", url: COMMUNITY_URL }],

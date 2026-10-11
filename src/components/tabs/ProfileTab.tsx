@@ -374,7 +374,7 @@ export function ProfileTab() {
           <Copy className="h-4 w-4" /> Share invite link
         </button>
         {data.referrals.list.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No referrals yet — share your link to earn up to 1,200 FOX per friend.</p>
+          <p className="text-sm text-muted-foreground">No referrals yet — share your link to earn up to {(data.referrals.rewards.join + data.referrals.rewards.day1 + data.referrals.rewards.day2).toLocaleString()} FOX per friend.</p>
         ) : (
           <ul className="space-y-2">
             {data.referrals.list.map((r) => (

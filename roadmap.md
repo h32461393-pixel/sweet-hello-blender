@@ -69,3 +69,4 @@
 - [x] Skip the tap tutorial for automatic Home interstitials; retain it for manually requested Adsgram ads. Each ad loads its own script when started.
 - [x] Tigorix partner bonus: ads watched inside Tigorix count toward progress — counts every ad there today (total or per-network, whichever it recorded), refreshes on return and every 15s, and says so plainly when the site isn't connected to Tigorix
 
+- [x] Admin settings for mining/daily/referral/task rewards apply to mini app + bot messages
