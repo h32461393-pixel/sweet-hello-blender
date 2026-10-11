@@ -258,7 +258,7 @@ export const getHomeState = createServerFn({ method: "POST" })
         reward: Number(mining["reward"] ?? 100),
         durationMinutes: Number(mining["duration_minutes"] ?? 60),
         usedToday: minedToday.count ?? 0,
-        dailyLimit: 10,
+        dailyLimit: Number(mining["daily_limit"] ?? 10),
       },
       daily: {
         rewards: (daily["rewards"] as number[]) ?? [30, 40, 50, 70, 90, 120, 150],
@@ -285,7 +285,9 @@ export const startMining = createServerFn({ method: "POST" })
       .eq("user_id", u.id)
       .eq("kind", "mining")
       .gte("created_at", dayStart);
-    if ((mined.count ?? 0) >= 10) throw new Error("Daily mining limit reached (10 per day). Come back after 00:00 UTC.");
+    const mcfg = await getConfig(ctx.db, "mining");
+    const cap = Number(mcfg["daily_limit"] ?? 10);
+    if ((mined.count ?? 0) >= cap) throw new Error(`Daily mining limit reached (${cap} per day). Come back after 00:00 UTC.`);
     const { error } = await ctx.db.rpc("start_mining_v1", { _user_id: u.id });
     if (error) throw new Error(rpcMessage(error, "Mining is already running"));
     return { ok: true };
@@ -845,6 +847,11 @@ export const getProfileState = createServerFn({ method: "POST" })
         at: r.created_at as string,
       })),
       referrals: {
+        rewards: {
+          join: Number(referralCfg["join"] ?? 200),
+          day1: Number(referralCfg["day1"] ?? 400),
+          day2: Number(referralCfg["day2"] ?? 600),
+        },
         count: refList.length,
         active: refList.filter((r) => !r.fake).length,
         pendingTotal: refList.reduce((n, r) => n + (r.status === "pending" ? Number(r.pending_reward ?? 0) : 0), 0),

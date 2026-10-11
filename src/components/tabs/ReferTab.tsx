@@ -23,6 +23,7 @@ export function ReferTab() {
   }
 
   const refs = data.referrals;
+  const rw = refs.rewards;
   const link = `${MINI_APP_URL}?startapp=ref${data.user.telegramId}`;
 
   async function copyLink() {
@@ -92,10 +93,10 @@ export function ReferTab() {
 
       <SectionTitle>How referral rewards work</SectionTitle>
       <div className="space-y-2 rounded-2xl border border-border bg-card p-4 text-sm">
-        <p>🥚 Friend joins — <b>200 FOX</b> (pending)</p>
-        <p>🌱 Friend watches 10 ads on day 1 — <b>400 FOX</b></p>
-        <p>🌳 Friend watches 15 ads on day 2 — <b>600 FOX</b></p>
-        <p className="border-t border-border pt-2 font-bold">Total 1,200 FOX per friend</p>
+        <p>🥚 Friend joins — <b>{rw.join.toLocaleString()} FOX</b> (pending)</p>
+        <p>🌱 Friend watches 10 ads on day 1 — <b>{rw.day1.toLocaleString()} FOX</b></p>
+        <p>🌳 Friend watches 15 ads on day 2 — <b>{rw.day2.toLocaleString()} FOX</b></p>
+        <p className="border-t border-border pt-2 font-bold">Total {(rw.join + rw.day1 + rw.day2).toLocaleString()} FOX per friend</p>
       </div>
 
       <SectionTitle>Referral history</SectionTitle>
