@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { GuideCard, SectionTitle, type TabKey } from "@/components/AppShell";
 import logo from "@/assets/fox-logo.png.asset.json";
-import { assetUrl, COMMUNITY_URL, NETWORK_LOGOS, PAYMENT_URL } from "@/lib/constants";
+import { assetUrl, COMMUNITY_URL, MINI_APP_URL, NETWORK_LOGOS, PAYMENT_URL } from "@/lib/constants";
 import { useAdsState, useTasks } from "@/hooks/useFarm";
 import { openLink, haptic } from "@/lib/telegram-client";
 import { useTheme } from "@/lib/theme";
@@ -384,5 +384,56 @@ function QuickTasks({ onTab }: { onTab?: ((t: TabKey) => void) | undefined }) {
         ))}
       </div>
     </>
+  );
+}
+
+function BioBoost({ telegramId, inBio, checking, onCheck }: { telegramId: number; inBio: boolean; checking: boolean; onCheck: () => void }) {
+  const link = `${MINI_APP_URL}?startapp=ref${telegramId}`;
+  return (
+    <div
+      className={`mt-3 rounded-2xl border p-3 transition-colors ${
+        inBio ? "border-usdt/40 bg-usdt/10" : "border-primary/30 bg-gradient-to-r from-primary/10 to-accent/10"
+      }`}
+    >
+      <div className="flex items-center gap-2">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary/15 text-lg">{inBio ? "✅" : "🚀"}</span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-black">{inBio ? "2× daily reward active" : "Get 2× daily reward"}</p>
+          <p className="text-[11px] text-muted-foreground">
+            {inBio ? "Your invite link is in your Telegram bio." : "Put your own invite link in your Telegram bio."}
+          </p>
+        </div>
+      </div>
+      {!inBio && (
+        <>
+          <p className="mt-2 truncate rounded-xl bg-background/70 px-2 py-1.5 font-mono text-[11px]">{link}</p>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <button
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(link);
+                  toast.success("Link copied — paste it in your bio");
+                } catch {
+                  toast.error("Could not copy the link");
+                }
+              }}
+              className="rounded-xl bg-secondary py-2 text-xs font-bold text-secondary-foreground"
+            >
+              📋 Copy link
+            </button>
+            <button
+              disabled={checking}
+              onClick={onCheck}
+              className="rounded-xl bg-primary py-2 text-xs font-bold text-primary-foreground disabled:opacity-50"
+            >
+              {checking ? "Checking…" : "🔍 Check bio"}
+            </button>
+          </div>
+          <p className="mt-2 text-[10px] text-muted-foreground">
+            Telegram → Settings → Edit profile → Bio. The ref ID must be yours, and your bio must be visible to everyone.
+          </p>
+        </>
+      )}
+    </div>
   );
 }
