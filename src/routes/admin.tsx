@@ -876,6 +876,14 @@ function Settings({ creds }: { creds: Creds }) {
   const wd = useQuery({ queryKey: ["admin-cfg-wd"], queryFn: () => getFn({ data: { ...creds, key: "withdraw" } }) });
   const tg = useQuery({ queryKey: ["admin-cfg-tg"], queryFn: () => getFn({ data: { ...creds, key: "tigorix" } }) });
   const [tD, setTD] = useState<Record<string, unknown> | null>(null);
+  const mq = useQuery({ queryKey: ["admin-cfg-mining"], queryFn: () => getFn({ data: { ...creds, key: "mining" } }) });
+  const rq = useQuery({ queryKey: ["admin-cfg-referral"], queryFn: () => getFn({ data: { ...creds, key: "referral" } }) });
+  const dq = useQuery({ queryKey: ["admin-cfg-daily"], queryFn: () => getFn({ data: { ...creds, key: "daily" } }) });
+  const tq = useQuery({ queryKey: ["admin-cfg-dtask"], queryFn: () => getFn({ data: { ...creds, key: "daily_task_reward" } }) });
+  const [mD, setMD] = useState<Record<string, unknown> | null>(null);
+  const [rD, setRD] = useState<Record<string, unknown> | null>(null);
+  const [dD, setDD] = useState<string | null>(null);
+  const [kD, setKD] = useState<Record<string, unknown> | null>(null);
   const parse = (j?: string) => { try { return JSON.parse(j ?? "{}") as Record<string, unknown>; } catch { return {}; } };
   const a = parse(app.data?.json);
   const w = parse(wd.data?.json);
@@ -884,6 +892,11 @@ function Settings({ creds }: { creds: Creds }) {
   const av = aD ?? a;
   const tv = tD ?? parse(tg.data?.json);
   const wv = wD ?? w;
+  const mv = mD ?? parse(mq.data?.json);
+  const rv = rD ?? parse(rq.data?.json);
+  const kv = kD ?? parse(tq.data?.json);
+  const dv = dD ?? (((parse(dq.data?.json)["rewards"] as number[]) ?? [30, 40, 50, 70, 90, 120, 150]).join(", "));
+  const n = (v: unknown, d: number) => (v === undefined || v === "" || !Number.isFinite(Number(v)) ? d : Number(v));
   const save = useMutation({
     mutationFn: async () => {
       await setFn({ data: { ...creds, key: "app", value: av } });
@@ -894,7 +907,13 @@ function Settings({ creds }: { creds: Creds }) {
         enabled: tv["enabled"] === undefined ? true : tv["enabled"] === true,
         reward: Number(tv["reward"] ?? 1000), fox_target: Number(tv["fox_target"] ?? 20), tigorix_target: Number(tv["tigorix_target"] ?? 15),
       } } });
-      setTD(null); qc.invalidateQueries({ queryKey: ["admin-cfg-tg"] });
+      await setFn({ data: { ...creds, key: "mining", value: { ...mv, reward: n(mv["reward"], 100), duration_minutes: n(mv["duration_minutes"], 60), daily_limit: n(mv["daily_limit"], 10) } } });
+      await setFn({ data: { ...creds, key: "referral", value: { ...rv, join: n(rv["join"], 200), day1: n(rv["day1"], 400), day2: n(rv["day2"], 600) } } });
+      await setFn({ data: { ...creds, key: "daily_task_reward", value: { ...kv, channel: n(kv["channel"], 50) } } });
+      const rewards = dv.split(",").map((x) => Number(x.trim())).filter((x) => Number.isFinite(x) && x > 0);
+      if (rewards.length) await setFn({ data: { ...creds, key: "daily", value: { rewards } } });
+      setTD(null); setMD(null); setRD(null); setDD(null); setKD(null);
+      for (const k of ["admin-cfg-tg", "admin-cfg-mining", "admin-cfg-referral", "admin-cfg-daily", "admin-cfg-dtask"]) qc.invalidateQueries({ queryKey: [k] });
     },
     onSuccess: () => { toast.success("Settings saved — live in the app"); setAD(null); setWD(null); qc.invalidateQueries({ queryKey: ["admin-cfg-app"] }); qc.invalidateQueries({ queryKey: ["admin-cfg-wd"] }); },
     onError: (e) => toast.error((e as Error).message),
@@ -932,6 +951,29 @@ function Settings({ creds }: { creds: Creds }) {
           {num("tokens_per_usd", "FOX per $1", 100000)}
           {num("req_daily_ads", "Daily ads needed", 30)}
           {num("req_referrals", "Referrals needed", 2)}
+        </div>
+      </Card>
+      <Card>
+        <p className="mb-2 text-sm font-black">⛏️ Mining</p>
+        <div className="grid grid-cols-3 gap-2">
+          <Field label="FOX / session" type="number" value={String(mv["reward"] ?? 100)} onChange={(v) => setMD({ ...mv, reward: v })} />
+          <Field label="Minutes" type="number" value={String(mv["duration_minutes"] ?? 60)} onChange={(v) => setMD({ ...mv, duration_minutes: v })} />
+          <Field label="Per day" type="number" value={String(mv["daily_limit"] ?? 10)} onChange={(v) => setMD({ ...mv, daily_limit: v })} />
+        </div>
+      </Card>
+      <Card>
+        <p className="mb-2 text-sm font-black">👥 Referral bonus</p>
+        <div className="grid grid-cols-3 gap-2">
+          <Field label="Join FOX" type="number" value={String(rv["join"] ?? 200)} onChange={(v) => setRD({ ...rv, join: v })} />
+          <Field label="Day 1 FOX" type="number" value={String(rv["day1"] ?? 400)} onChange={(v) => setRD({ ...rv, day1: v })} />
+          <Field label="Day 2 FOX" type="number" value={String(rv["day2"] ?? 600)} onChange={(v) => setRD({ ...rv, day2: v })} />
+        </div>
+      </Card>
+      <Card>
+        <p className="mb-2 text-sm font-black">🎁 Daily rewards</p>
+        <div className="space-y-2">
+          <Field label="7-day streak FOX (comma separated)" value={dv} onChange={(v) => setDD(v)} />
+          <Field label="Daily channel task FOX" type="number" value={String(kv["channel"] ?? 50)} onChange={(v) => setKD({ ...kv, channel: v })} />
         </div>
       </Card>
       <Card>
