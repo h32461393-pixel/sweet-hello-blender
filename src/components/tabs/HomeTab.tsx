@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { GuideCard, SectionTitle, type TabKey } from "@/components/AppShell";
 import logo from "@/assets/fox-logo.png.asset.json";
-import { assetUrl, COMMUNITY_URL, NETWORK_LOGOS, PAYMENT_URL } from "@/lib/constants";
+import { assetUrl, COMMUNITY_URL, MINI_APP_URL, NETWORK_LOGOS, PAYMENT_URL } from "@/lib/constants";
 import { useAdsState, useTasks } from "@/hooks/useFarm";
 import { openLink, haptic } from "@/lib/telegram-client";
 import { useTheme } from "@/lib/theme";
@@ -18,6 +18,7 @@ import {
   useStartMining,
   useClaimMining,
   useClaimDaily,
+  useDailyBio,
   useClaimRewardCode,
   friendlyError,
 } from "@/hooks/useFarm";
@@ -44,6 +45,7 @@ export function HomeTab({ onTab }: { onTab?: (t: TabKey) => void }) {
   const start = useStartMining();
   const claim = useClaimMining();
   const daily = useClaimDaily();
+  const bioQuery = useDailyBio();
   const code = useClaimRewardCode();
   const [codeValue, setCodeValue] = useState("");
 
@@ -85,6 +87,7 @@ export function HomeTab({ onTab }: { onTab?: (t: TabKey) => void }) {
 
   const u = data.user;
   const dailyRewards = data.daily.rewards;
+  const bio = bioQuery;
   const nextDay = data.daily.claimedToday ? u.streakDay : Math.min(u.streakDay % dailyRewards.length, dailyRewards.length - 1) + 1;
 
   return (
@@ -300,19 +303,25 @@ export function HomeTab({ onTab }: { onTab?: (t: TabKey) => void }) {
             );
           })}
         </div>
+        <BioBoost telegramId={u.telegramId} inBio={!!bio.data?.inBio} checking={bio.isFetching} onCheck={() => bio.refetch()} />
         <button
           disabled={data.daily.claimedToday || daily.isPending}
           onClick={() => {
             haptic();
             daily.mutate({} as never, {
-              onSuccess: (r) => toast.success(`🎁 Day ${r.day}: +${r.reward} FOX`),
+              onSuccess: (r) => {
+                showRewardPopup(r.reward, r.doubled ? `Day ${r.day} · 2× bio bonus` : `Day ${r.day} reward`);
+                bio.refetch();
+              },
               onError: (e) => toast.error(friendlyError(e)),
             });
           }}
           className="mt-3 w-full rounded-2xl bg-accent py-3 font-bold text-accent-foreground disabled:opacity-50 active:scale-[0.98]"
         >
           <Gift className="mr-2 inline h-4 w-4" />
-          {data.daily.claimedToday ? "Claimed today — come back tomorrow" : `Claim day ${nextDay}`}
+          {data.daily.claimedToday
+            ? "Claimed today — come back tomorrow"
+            : `Claim day ${nextDay}${bio.data?.inBio ? ` · 2× ${(dailyRewards[nextDay - 1] ?? 0) * 2} FOX` : ""}`}
         </button>
         <div className="mt-3" />
         <GuideCard title="Streak rules">
@@ -375,5 +384,56 @@ function QuickTasks({ onTab }: { onTab?: ((t: TabKey) => void) | undefined }) {
         ))}
       </div>
     </>
+  );
+}
+
+function BioBoost({ telegramId, inBio, checking, onCheck }: { telegramId: number; inBio: boolean; checking: boolean; onCheck: () => void }) {
+  const link = `${MINI_APP_URL}?startapp=ref${telegramId}`;
+  return (
+    <div
+      className={`mt-3 rounded-2xl border p-3 transition-colors ${
+        inBio ? "border-usdt/40 bg-usdt/10" : "border-primary/30 bg-gradient-to-r from-primary/10 to-accent/10"
+      }`}
+    >
+      <div className="flex items-center gap-2">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary/15 text-lg">{inBio ? "✅" : "🚀"}</span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-black">{inBio ? "2× daily reward active" : "Get 2× daily reward"}</p>
+          <p className="text-[11px] text-muted-foreground">
+            {inBio ? "Your invite link is in your Telegram bio." : "Put your own invite link in your Telegram bio."}
+          </p>
+        </div>
+      </div>
+      {!inBio && (
+        <>
+          <p className="mt-2 truncate rounded-xl bg-background/70 px-2 py-1.5 font-mono text-[11px]">{link}</p>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <button
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(link);
+                  toast.success("Link copied — paste it in your bio");
+                } catch {
+                  toast.error("Could not copy the link");
+                }
+              }}
+              className="rounded-xl bg-secondary py-2 text-xs font-bold text-secondary-foreground"
+            >
+              📋 Copy link
+            </button>
+            <button
+              disabled={checking}
+              onClick={onCheck}
+              className="rounded-xl bg-primary py-2 text-xs font-bold text-primary-foreground disabled:opacity-50"
+            >
+              {checking ? "Checking…" : "🔍 Check bio"}
+            </button>
+          </div>
+          <p className="mt-2 text-[10px] text-muted-foreground">
+            Telegram → Settings → Edit profile → Bio. The ref ID must be yours, and your bio must be visible to everyone.
+          </p>
+        </>
+      )}
+    </div>
   );
 }

@@ -6,6 +6,7 @@ import {
   startMining,
   claimMining,
   claimDaily,
+  checkDailyBio,
   claimRewardCode,
   claimChannelTask,
   getAdsState,
@@ -60,6 +61,16 @@ export function useClaimMining() {
 }
 export function useClaimDaily() {
   return useFarmAction(useServerFn(claimDaily));
+}
+export function useDailyBio(enabled = true) {
+  const fn = useServerFn(checkDailyBio);
+  return useQuery({
+    queryKey: ["daily-bio"],
+    queryFn: () => fn({ data: { initData: getInitData() } }),
+    enabled,
+    refetchOnWindowFocus: true,
+    retry: 1,
+  });
 }
 export function useClaimRewardCode() {
   return useFarmAction(useServerFn(claimRewardCode));
