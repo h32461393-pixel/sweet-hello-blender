@@ -327,12 +327,33 @@ export const claimDaily = createServerFn({ method: "POST" })
     const u = await getUserRow(ctx);
 
     const cfg = await getConfig(ctx.db, "daily");
-    const rewards = ((cfg["rewards"] as number[]) ?? [30, 40, 50, 70, 90, 120, 150]).map(Number);
+    const base = ((cfg["rewards"] as number[]) ?? [30, 40, 50, 70, 90, 120, 150]).map(Number);
+    // Double reward when the user's own invite link is in their Telegram bio.
+    const doubled = await bioHasRefLink(ctx.tg.id);
+    const rewards = doubled ? base.map((r) => r * 2) : base;
 
     const res = await ctx.db.rpc("claim_daily_v1", { _user_id: u.id, _rewards: rewards });
     if (res.error) throw new Error(rpcMessage(res.error, "Already claimed today"));
     const out = res.data as { reward: number; day: number; balance: number };
-    return { reward: Number(out.reward), day: Number(out.day), balance: Number(out.balance) };
+    return { reward: Number(out.reward), day: Number(out.day), balance: Number(out.balance), doubled };
+  });
+
+/** True when the Telegram bio contains this user's own invite link (exact ref id). */
+async function bioHasRefLink(tgId: number): Promise<boolean> {
+  const { tgCall } = await import("./telegram.server");
+  const chat = await tgCall<{ bio?: string }>("getChat", { chat_id: tgId });
+  const bio = (chat?.bio ?? "").toLowerCase();
+  const path = MINI_APP_URL.replace(/^https?:\/\//, "").toLowerCase();
+  const re = new RegExp(`${path.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&")}\\?startapp=ref${tgId}(?!\\d)`);
+  return re.test(bio);
+}
+
+export const checkDailyBio = createServerFn({ method: "POST" })
+  .inputValidator(vInit)
+  .handler(async ({ data }) => {
+    const ctx = await loadCtx(data.initData);
+    await rateLimit(ctx.db, "daily_bio", ctx.tg.id, 20, 60);
+    return { inBio: await bioHasRefLink(ctx.tg.id) };
   });
 
 export const claimRewardCode = createServerFn({ method: "POST" })
