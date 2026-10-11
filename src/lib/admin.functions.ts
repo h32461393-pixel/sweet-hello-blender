@@ -641,7 +641,22 @@ export const adminListPartners = createServerFn({ method: "POST" })
     const ctx = await adminCtx(data);
     const { data: row } = await ctx.db.from("app_config").select("value").eq("key", "partner_channels").maybeSingle();
     const list = (Array.isArray(row?.value) ? row.value : []) as Partner[];
-    return { partners: list, defaultLink: ADMIN_REFER_LINK };
+    // Partner-section tasks also appear here so the admin can post to them.
+    const [{ data: tk }, { data: lk }] = await Promise.all([
+      ctx.db.from("tasks").select("id, title, url, chat_username").eq("section", "partner").order("sort_order"),
+      ctx.db.from("app_config").select("value").eq("key", "partner_task_links").maybeSingle(),
+    ]);
+    const links = (lk?.value && typeof lk.value === "object" ? lk.value : {}) as Record<string, string>;
+    const taskPartners = (tk ?? []).map((t) => {
+      let chat = String(t.chat_username ?? "").trim();
+      if (!chat) {
+        const m = String(t.url ?? "").match(/t\.me\/([A-Za-z0-9_]{4,})/i);
+        if (m && !/bot$/i.test(m[1])) chat = "@" + m[1];
+      }
+      if (chat && !chat.startsWith("@") && !/^-?\d+$/.test(chat)) chat = "@" + chat;
+      return { id: String(t.id), title: String(t.title), chat, referLink: links[String(t.id)] ?? "" };
+    });
+    return { partners: list, taskPartners, defaultLink: ADMIN_REFER_LINK };
   });
 
 export const adminSavePartners = createServerFn({ method: "POST" })
@@ -667,6 +682,28 @@ export const adminSavePartners = createServerFn({ method: "POST" })
       .upsert({ key: "partner_channels", value: data.partners as never }, { onConflict: "key" });
     if (error) throw new Error(dbHint(error) ?? "Could not save");
     await audit(ctx, "partners_save", null, { count: data.partners.length });
+    return { ok: true };
+  });
+
+/** Save the refer link used in posts for one partner-section task. */
+export const adminSaveTaskPartnerLink = createServerFn({ method: "POST" })
+  .inputValidator((d: Auth & { taskId: string; referLink: string }) => {
+    vAuth(d);
+    const link = String(d.referLink ?? "").trim().slice(0, 300);
+    if (link && !/^https:\/\//i.test(link)) throw new Error("Refer link must start with https://");
+    return { ...d, taskId: String(d.taskId).slice(0, 40), referLink: link };
+  })
+  .handler(async ({ data }) => {
+    const ctx = await adminCtx(data);
+    const { data: lk } = await ctx.db.from("app_config").select("value").eq("key", "partner_task_links").maybeSingle();
+    const links = { ...((lk?.value && typeof lk.value === "object" ? lk.value : {}) as Record<string, string>) };
+    if (data.referLink) links[data.taskId] = data.referLink;
+    else delete links[data.taskId];
+    const { error } = await ctx.db
+      .from("app_config")
+      .upsert({ key: "partner_task_links", value: links as never }, { onConflict: "key" });
+    if (error) throw new Error(dbHint(error) ?? "Could not save");
+    await audit(ctx, "partner_task_link", data.taskId, { link: data.referLink });
     return { ok: true };
   });
 

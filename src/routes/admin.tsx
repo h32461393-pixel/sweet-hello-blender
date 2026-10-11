@@ -27,6 +27,7 @@ import {
   adminSavePartners,
   adminCheckBotAdmin,
   adminPostPartner,
+  adminSaveTaskPartnerLink,
 } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/admin")({
@@ -761,9 +762,16 @@ function Partners({ creds }: { creds: Creds }) {
   const saveFn = useServerFn(adminSavePartners);
   const checkFn = useServerFn(adminCheckBotAdmin);
   const postFn = useServerFn(adminPostPartner);
+  const linkFn = useServerFn(adminSaveTaskPartnerLink);
   const qc = useQueryClient();
   const { data } = useQuery({ queryKey: ["admin-partners"], queryFn: () => listFn({ data: creds }) });
   const items = (data?.partners ?? []) as PartnerRow[];
+  const taskItems = (data?.taskPartners ?? []) as PartnerRow[];
+  const saveLink = useMutation({
+    mutationFn: (v: { taskId: string; referLink: string }) => linkFn({ data: { ...creds, ...v } }),
+    onSuccess: () => { toast.success("Refer link saved"); qc.invalidateQueries({ queryKey: ["admin-partners"] }); },
+    onError: (e) => toast.error((e as Error).message),
+  });
   const [title, setTitle] = useState("");
   const [chat, setChat] = useState("");
   const [link, setLink] = useState("");
@@ -835,6 +843,27 @@ function Partners({ creds }: { creds: Creds }) {
         </Card>
       ))}
       {!items.length && <p className="text-center text-xs text-muted-foreground">No partner channels yet.</p>}
+      <p className="pt-2 text-sm font-black">📋 Partner tasks (from Tasks)</p>
+      {taskItems.map((p) => (
+        <Card key={p.id}>
+          <p className="truncate text-sm font-black">{p.title}</p>
+          <p className="truncate text-[11px] text-muted-foreground">{p.chat || "no channel"} · {p.referLink || "default refer link"}</p>
+          <div className="mt-2 grid grid-cols-3 gap-1">
+            <button disabled={!p.chat} onClick={() => check.mutate(p.chat)} className="rounded-lg bg-secondary py-1 text-[11px] font-bold disabled:opacity-50">Check</button>
+            <button onClick={() => post.mutate(p)} disabled={!p.chat || post.isPending} className="rounded-lg bg-primary py-1 text-[11px] font-bold text-primary-foreground disabled:opacity-50">Post</button>
+            <button
+              onClick={() => {
+                const l = window.prompt("Refer link (button)", p.referLink || data?.defaultLink || "");
+                if (l !== null) saveLink.mutate({ taskId: p.id, referLink: l.trim() });
+              }}
+              className="rounded-lg bg-secondary py-1 text-[11px] font-bold"
+            >
+              Link
+            </button>
+          </div>
+        </Card>
+      ))}
+      {!taskItems.length && <p className="text-center text-xs text-muted-foreground">No partner-section tasks yet.</p>}
     </div>
   );
 }
