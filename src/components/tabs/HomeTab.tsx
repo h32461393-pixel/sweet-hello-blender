@@ -85,6 +85,7 @@ export function HomeTab({ onTab }: { onTab?: (t: TabKey) => void }) {
 
   const u = data.user;
   const dailyRewards = data.daily.rewards;
+  const bio = bioQuery;
   const nextDay = data.daily.claimedToday ? u.streakDay : Math.min(u.streakDay % dailyRewards.length, dailyRewards.length - 1) + 1;
 
   return (
@@ -300,19 +301,25 @@ export function HomeTab({ onTab }: { onTab?: (t: TabKey) => void }) {
             );
           })}
         </div>
+        <BioBoost telegramId={u.telegramId} inBio={!!bio.data?.inBio} checking={bio.isFetching} onCheck={() => bio.refetch()} />
         <button
           disabled={data.daily.claimedToday || daily.isPending}
           onClick={() => {
             haptic();
             daily.mutate({} as never, {
-              onSuccess: (r) => toast.success(`🎁 Day ${r.day}: +${r.reward} FOX`),
+              onSuccess: (r) => {
+                showRewardPopup(r.reward, r.doubled ? `Day ${r.day} · 2× bio bonus` : `Day ${r.day} reward`);
+                bio.refetch();
+              },
               onError: (e) => toast.error(friendlyError(e)),
             });
           }}
           className="mt-3 w-full rounded-2xl bg-accent py-3 font-bold text-accent-foreground disabled:opacity-50 active:scale-[0.98]"
         >
           <Gift className="mr-2 inline h-4 w-4" />
-          {data.daily.claimedToday ? "Claimed today — come back tomorrow" : `Claim day ${nextDay}`}
+          {data.daily.claimedToday
+            ? "Claimed today — come back tomorrow"
+            : `Claim day ${nextDay}${bio.data?.inBio ? ` · 2× ${(dailyRewards[nextDay - 1] ?? 0) * 2} FOX` : ""}`}
         </button>
         <div className="mt-3" />
         <GuideCard title="Streak rules">
