@@ -651,7 +651,7 @@ export const adminListPartners = createServerFn({ method: "POST" })
       let chat = String(t.chat_username ?? "").trim();
       if (!chat) {
         const m = String(t.url ?? "").match(/t\.me\/([A-Za-z0-9_]{4,})/i);
-        if (m && !/bot$/i.test(m[1])) chat = "@" + m[1];
+        if (m && !/bot$/i.test(m[1] ?? "")) chat = "@" + (m[1] ?? "");
       }
       if (chat && !chat.startsWith("@") && !/^-?\d+$/.test(chat)) chat = "@" + chat;
       return { id: String(t.id), title: String(t.title), chat, referLink: links[String(t.id)] ?? "" };
