@@ -22,7 +22,7 @@ const SCRIPTS: Record<string, { src: string; attrs?: Record<string, string> }> =
   adsgram: { src: "https://sad.adsgram.ai/js/sad.min.js" },
   monetag: { src: "https://libtl.com/sdk.js", attrs: { "data-zone": MONETAG_ZONE, "data-sdk": `show_${MONETAG_ZONE}` } },
   gigapub: { src: "https://ad.gigapub.tech/script?id=8347" },
-  monetix: { src: "https://www.monetixads.online/ads.js", attrs: { "data-mxid": "MX-BE2625D4" } },
+  monetix: { src: "https://www.monetixads.online/ads.js", attrs: { "data-mxid": "MX-97998D8A" } },
 };
 const loading = new Map<string, Promise<void>>();
 
@@ -299,10 +299,12 @@ async function showAdRaw(net: AdNetwork): Promise<void> {
 /** Backwards compatible helper. */
 export const showRewardedAd = () => showAd("adsgram");
 
+/** Weighted random pick: mostly Adsgram, sometimes GigaPub / Monetix. */
 export function randomAdsgram(): AdNetwork {
-  return Math.random() < 0.5 ? "adsgram" : "adsgram_int";
+  const r = Math.random();
+  if (r < 0.4) return "adsgram";
+  if (r < 0.7) return "adsgram_int";
+  if (r < 0.85) return "gigapub";
+  return "monetix";
 }
-export function randomNetwork(): AdNetwork {
-  const all: AdNetwork[] = ["adsgram", "adsgram_int", "monetag", "gigapub", "monetix"];
-  return all[Math.floor(Math.random() * all.length)]!;
-}
+export const randomNetwork = randomAdsgram;

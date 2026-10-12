@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { AdOverlay, requireAd } from "@/components/AdGate";
-import { preloadAds } from "@/lib/adsgram";
+import { preloadAds, randomAdsgram } from "@/lib/adsgram";
 import { useServerFn } from "@tanstack/react-start";
 import { Toaster } from "@/components/ui/sonner";
 import { Splash } from "@/components/Splash";
@@ -134,7 +134,7 @@ function HomeInterstitial({ tab }: { tab: TabKey }) {
     preloadAds();
   }, []);
   useEffect(() => {
-    if (tab === "home") requireAd("adsgram_int", { skipTutorial: true }).catch(() => {});
+    if (tab === "home") requireAd(randomAdsgram, { skipTutorial: true }).catch(() => {});
   }, [tab]);
   return null;
 }
