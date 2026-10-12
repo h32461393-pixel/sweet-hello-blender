@@ -306,8 +306,14 @@ export function HomeTab({ onTab }: { onTab?: (t: TabKey) => void }) {
         <BioBoost telegramId={u.telegramId} inBio={!!bio.data?.inBio} checked={bio.data !== undefined} checking={bio.isFetching} onCheck={() => bio.refetch()} />
         <button
           disabled={data.daily.claimedToday || daily.isPending}
-          onClick={() => {
+          onClick={async () => {
             haptic();
+            try {
+              await requireAd(randomAdsgram);
+            } catch {
+              toast.error("No ad watched — no reward given.");
+              return;
+            }
             daily.mutate({} as never, {
               onSuccess: (r) => {
                 showRewardPopup(r.reward, r.doubled ? `Day ${r.day} · 2× bio bonus` : `Day ${r.day} reward`);
