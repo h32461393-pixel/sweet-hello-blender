@@ -22,7 +22,7 @@ const SCRIPTS: Record<string, { src: string; attrs?: Record<string, string> }> =
   adsgram: { src: "https://sad.adsgram.ai/js/sad.min.js" },
   monetag: { src: "https://libtl.com/sdk.js", attrs: { "data-zone": MONETAG_ZONE, "data-sdk": `show_${MONETAG_ZONE}` } },
   gigapub: { src: "https://ad.gigapub.tech/script?id=8347" },
-  monetix: { src: "https://www.monetixads.online/ads.js", attrs: { "data-mxid": "MX-97998D8A" } },
+  monetix: { src: "https://www.monetixads.online/ads.js", attrs: { "data-mxid": "MX-BE2625D4" } },
 };
 const loading = new Map<string, Promise<void>>();
 
